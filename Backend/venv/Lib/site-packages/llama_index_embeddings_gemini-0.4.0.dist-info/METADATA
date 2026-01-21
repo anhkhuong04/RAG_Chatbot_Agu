@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: llama-index-embeddings-gemini
+Version: 0.4.0
+Summary: llama-index embeddings gemini integration
+Author-email: Your Name <you@example.com>
+License-Expression: MIT
+License-File: LICENSE
+Requires-Python: <4.0,>=3.9
+Requires-Dist: google-generativeai>=0.5.2
+Requires-Dist: llama-index-core<0.14,>=0.13.0
+Description-Content-Type: text/markdown
+
+# LlamaIndex Embeddings Integration: Gemini
+
+**NOTE:** This package is deprecated. Please use the `GoogleGenAIEmbedding` class instead, detailed [here](https://github.com/run-llama/llama_index/blob/main/docs/docs/examples/embeddings/google_genai.ipynb).

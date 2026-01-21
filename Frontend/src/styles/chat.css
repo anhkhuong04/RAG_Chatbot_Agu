@@ -1,0 +1,296 @@
+/* ========================================
+   CHAT PAGE CUSTOM STYLES
+   Các styles đặc biệt không thể làm với Tailwind
+======================================== */
+
+/* Smooth fade-in animation for messages */
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-animate {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+/* Typing indicator animation */
+@keyframes typingBounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-4px);
+  }
+}
+
+.typing-dot {
+  animation: typingBounce 1.4s infinite;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Custom scrollbar for chat */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Conversation item hover effect */
+.conversation-item-hover {
+  position: relative;
+  overflow: hidden;
+}
+
+.conversation-item-hover::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(59, 130, 246, 0.1),
+    transparent
+  );
+  transition: left 0.5s;
+}
+
+.conversation-item-hover:hover::before {
+  left: 100%;
+}
+
+/* Gradient text for bot name */
+.gradient-text-bot {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Message bubble shadows */
+.message-user-bubble {
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+}
+
+.message-bot-bubble {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* Input focus glow */
+.input-focus-glow:focus-within {
+  box-shadow:
+    0 0 0 3px rgba(59, 130, 246, 0.1),
+    0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Header gradient background */
+.chat-header-gradient {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Sidebar header gradient */
+.sidebar-header-gradient {
+  background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+/* Smooth page transitions */
+.page-transition {
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Markdown content styling */
+.markdown-content {
+  line-height: 1.7;
+}
+
+.markdown-content p {
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin-left: 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content li {
+  margin-bottom: 0.25rem;
+}
+
+.markdown-content code {
+  background: #f1f5f9;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  color: #e11d48;
+}
+
+.markdown-content pre {
+  background: #1e293b;
+  color: #e2e8f0;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+  margin-bottom: 0.75rem;
+}
+
+.markdown-content pre code {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+/* Empty state illustration pulse */
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.empty-state-icon {
+  animation: pulse-soft 2s ease-in-out infinite;
+}
+
+/* New chat button pulse effect */
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0);
+  }
+}
+
+.new-chat-pulse:hover {
+  animation: pulse-ring 1.5s infinite;
+}
+
+/* Smooth height transition for textarea */
+.textarea-smooth {
+  transition: height 0.1s ease-out;
+}
+
+/* Remove textarea spinner arrows and resize handle */
+.textarea-smooth::-webkit-resizer,
+.textarea-smooth::-webkit-scrollbar {
+  display: none;
+}
+
+.textarea-smooth {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* ========================================
+   INPUT TRANSITION ANIMATIONS
+   Hiệu ứng chuyển cảnh cho ô Input
+======================================== */
+
+/* Welcome content fade in animation */
+@keyframes welcomeFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.welcome-content {
+  animation: welcomeFadeIn 0.6s ease-out;
+}
+
+/* Input container at bottom - smooth appearance */
+.input-container-bottom {
+  animation: slideUpFade 0.4s ease-out;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Suggestion buttons stagger animation */
+@keyframes suggestionFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.grid button {
+  animation: suggestionFadeIn 0.4s ease-out backwards;
+}
+
+.grid button:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.grid button:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.grid button:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.grid button:nth-child(4) {
+  animation-delay: 0.4s;
+}

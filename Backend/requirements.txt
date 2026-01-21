@@ -1,0 +1,28 @@
+# Web Framework
+fastapi
+uvicorn[standard]
+python-dotenv
+
+# LlamaIndex Core & OpenAI
+llama-index
+llama-index-llms-openai
+llama-index-embeddings-openai
+
+# Parsing & Vector Store
+llama-parse
+llama-index-vector-stores-qdrant
+qdrant-client
+
+# Re-ranking (Advanced RAG)
+sentence-transformers
+torch
+
+# Redis Cache (Optional but recommended)
+redis
+
+# Optional: Cohere (nếu dùng Cohere reranker)
+# cohere
+
+# Utilities
+pydantic
+pydantic-settings
