@@ -111,7 +111,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Title Section */}
       {!isCollapsed && (
         <div className="px-4 pb-4">
-          <h3 className="text-xl font-extrabold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent text-center m-0 leading-tight">
+          <h3 className="text-xl font-extrabold bg-orange-400 bg-clip-text text-transparent text-center m-0 leading-tight">
             AGU Tư Vấn Tuyển Sinh
           </h3>
           <p className="text-sm text-black text-center mt-2 font-medium">

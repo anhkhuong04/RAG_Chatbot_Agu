@@ -31,9 +31,7 @@ const Message: React.FC<MessageProps> = ({ message }) => {
       </div>
 
       {/* Message Content */}
-      <div
-        className={`min-w-0 ${isUser ? "max-w-[70%]" : "flex-1 max-w-[85%]"}`}
-      >
+      <div className={`min-w-0 ${isUser ? "max-w-[70%]" : "max-w-[90%]"}`}>
         {/* Header */}
         <div
           className={`flex items-center gap-2 mb-2 ${
@@ -45,7 +43,7 @@ const Message: React.FC<MessageProps> = ({ message }) => {
               isUser ? "text-gray-700" : "gradient-text-bot"
             }`}
           >
-            {isUser ? "Bạn" : "AGU Tư Vấn"}
+            {isUser ? "Bạn" : "Bot"}
           </span>
           <span className="text-xs text-gray-400 font-medium">
             {message.timestamp.toLocaleTimeString("vi-VN", {
@@ -67,6 +65,18 @@ const Message: React.FC<MessageProps> = ({ message }) => {
             <p className="text-[15px] leading-relaxed font-medium">
               {message.content}
             </p>
+          ) : message.isStreaming && !message.content ? (
+            /* Thinking indicator inside the bubble */
+            <div className="flex items-center gap-3 py-1">
+              <div className="flex gap-1">
+                <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:0ms]"></span>
+                <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:150ms]"></span>
+                <span className="w-2 h-2 bg-orange-400 rounded-full animate-bounce [animation-delay:300ms]"></span>
+              </div>
+              <span className="text-sm text-gray-500 font-medium">
+                Đang suy nghĩ
+              </span>
+            </div>
           ) : (
             <div className="markdown-content prose prose-sm max-w-none">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>

@@ -140,6 +140,16 @@
   line-height: 1.7;
 }
 
+.markdown-content a {
+  color: #2563eb;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+.markdown-content a:hover {
+  color: #1d4ed8;
+}
+
 .markdown-content p {
   margin-bottom: 0.75rem;
 }
@@ -175,6 +185,82 @@
   background: transparent;
   color: inherit;
   padding: 0;
+}
+
+/* ========================================
+   MARKDOWN TABLES
+   Styles cho bảng Markdown
+======================================== */
+
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Header */
+.markdown-content thead {
+  background: yellow;
+}
+
+.markdown-content th {
+  color: black;
+  font-weight: 600;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  border: none;
+  white-space: nowrap;
+}
+
+/* ===== BODY: nền bạc – chữ đen ===== */
+
+.markdown-content tbody tr {
+  background: whitesmoke; /* bạc nhạt */
+  color: #000; /* chữ đen */
+  transition: background-color 0.15s ease;
+}
+
+.markdown-content tbody tr:nth-child(even) {
+  background: white;
+}
+
+.markdown-content td {
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid white;
+  color: #000; /* chữ đen */
+}
+
+.markdown-content td:first-child {
+  font-weight: 500;
+  color: #000; /* chữ đen */
+}
+
+/* Responsive table wrapper */
+.markdown-content .table-wrapper {
+  overflow-x: auto;
+  margin: 1rem 0;
+  border-radius: 0.5rem;
+}
+
+/* ===== Dark mode (giữ màu bạc + chữ đen theo yêu cầu) ===== */
+@media (prefers-color-scheme: dark) {
+  .markdown-content table {
+    box-shadow: 0 1px 3px rgba(255, 255, 255, 0.2);
+  }
+
+  .markdown-content tbody tr,
+  .markdown-content tbody tr:nth-child(even),
+  .markdown-content tbody tr:hover,
+  .markdown-content td,
+  .markdown-content td:first-child {
+    background: whitesmoke;
+    color: #000;
+  }
 }
 
 /* Empty state illustration pulse */

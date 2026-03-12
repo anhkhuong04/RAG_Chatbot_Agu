@@ -4,6 +4,7 @@ export interface Message {
   role: "user" | "assistant";
   timestamp: Date;
   sources?: Source[];
+  isStreaming?: boolean; // true while tokens are still arriving
 }
 
 export interface Source {
@@ -21,6 +22,12 @@ export interface ChatResponse {
   response: string;
   sources?: string[];
   conversation_id: string;
+}
+
+/** Metadata sent as the first SSE event */
+export interface StreamMetadata {
+  session_id: string;
+  intent: string;
 }
 
 export interface Conversation {

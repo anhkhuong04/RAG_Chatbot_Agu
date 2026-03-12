@@ -29,8 +29,8 @@ const ChatPage: React.FC = () => {
   const suggestions = [
     {
       icon: "💡",
-      text: "Giới thiệu về Trường Đại học An Giang",
-      message: "Giới thiệu về Trường Đại học An Giang",
+      text: "Giới thiệu về Khoa Công nghệ thông tin",
+      message: "Giới thiệu về Khoa Công nghệ thông tin",
     },
     {
       icon: "📚",
@@ -39,13 +39,13 @@ const ChatPage: React.FC = () => {
     },
     {
       icon: "📊",
-      text: "Điểm chuẩn các ngành năm trước?",
-      message: "Điểm chuẩn các ngành năm trước là bao nhiêu?",
+      text: "Điểm chuẩn ngành CNTT, KTPM năm trước?",
+      message: "Điểm chuẩn các ngành CNTT, KTPM năm trước là bao nhiêu?",
     },
     {
       icon: "💰",
-      text: "Học bổng dành cho tân sinh viên?",
-      message: "Có học bổng nào dành cho tân sinh viên không?",
+      text: "Học phí bao nhiêu cho 1 năm học?",
+      message: "Học phí bao nhiêu cho 1 năm học ngành CNTT?",
     },
   ];
 
@@ -82,11 +82,12 @@ const ChatPage: React.FC = () => {
           <div className="text-center mb-8 welcome-content">
             <div className="empty-state-icon text-7xl mb-6">🎓</div>
             <h2 className="text-3xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent mb-4">
-              Xin chào! Tôi là trợ lý tuyển sinh AGU
+              Xin chào! Tôi là trợ lý ảo tuyển sinh của Khoa Công nghệ Thông tin
+              (FIT AGU).
             </h2>
             <p className="text-gray-600 text-lg max-w-xl mx-auto">
               Bạn cần thông tin gì về Trường hay giải đáp thắc mắc về kỳ tuyển
-              sinh của Đại học An Giang năm {currentYear}?
+              sinh của Trường Đại học An Giang năm {currentYear}?
             </p>
           </div>
 

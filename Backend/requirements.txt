@@ -2,6 +2,7 @@
 fastapi
 uvicorn[standard]
 python-dotenv
+python-multipart
 
 # LlamaIndex Core & OpenAI
 llama-index
@@ -17,12 +18,32 @@ qdrant-client
 sentence-transformers
 torch
 
+# Hybrid Search (BM25 + Dense)
+llama-index-retrievers-bm25
+rank-bm25
+
+# Structured Data Query (Pandas + CSV)
+llama-index-experimental
+pandas
+
 # Redis Cache (Optional but recommended)
 redis
 
-# Optional: Cohere (nếu dùng Cohere reranker)
-# cohere
+# Web Search Fallback (Optional - for fallback mechanism)
+ddgs
+
+# Document Parsing (Multi-format support)
+python-docx
+docx2txt
+pillow
+striprtf
 
 # Utilities
 pydantic
 pydantic-settings
+pymongo
+
+# Authentication (JWT + bcrypt)
+python-jose[cryptography]
+passlib[bcrypt]
+bcrypt>=4.0.1,<4.1

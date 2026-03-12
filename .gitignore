@@ -1,7 +1,8 @@
- # Python
+# Python
 __pycache__/
 *.pyc
 .venv/
+Backend/venv/
 .env
 
 # Node
@@ -11,3 +12,13 @@ dist/
 
 # Logs
 *.log
+
+# Database data
+mongo_data/
+qdrant_data/
+
+# IDE
+.vscode/
+
+# Storage
+Backend/storage/

@@ -39,8 +39,8 @@ const Hero: React.FC = () => {
 
             {/* Subtitle */}
             <p className="text-lg sm:text-xl text-gray-600 mb-8 max-w-xl mx-auto lg:mx-0 animate-slide-up animation-delay-200">
-              Trường Đại học An Giang - ĐHQG TPHCM. Giải đáp mọi thắc mắc về
-              ngành học, điểm chuẩn, học phí và quy chế tuyển sinh.
+              Khoa Công nghệ thông tin - Trường Đại học An Giang. Giải đáp mọi
+              thắc mắc về ngành học, điểm chuẩn, học phí và quy chế tuyển sinh.
             </p>
 
             {/* CTA Buttons */}

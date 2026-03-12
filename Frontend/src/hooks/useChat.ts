@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
-  sendMessage,
+  sendMessageStream,
   deleteConversation as apiDeleteConversation,
 } from "../services/chatAPI";
 import type { Message, Conversation } from "../types/chat";
@@ -13,8 +13,11 @@ export const useChat = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Track the active stream so it can be cancelled
+  const abortControllerRef = useRef<AbortController | null>(null);
+
   const activeConversation = conversations.find(
-    (c) => c.id === activeConversationId
+    (c) => c.id === activeConversationId,
   );
 
   const createNewConversation = (): string => {
@@ -23,15 +26,28 @@ export const useChat = () => {
       title: "Cuộc trò chuyện mới",
       messages: [],
       timestamp: new Date(),
-      serverConversationId: undefined, // Will be set after first message
+      serverConversationId: undefined,
     };
     setConversations((prev) => [newConv, ...prev]);
     setActiveConversationId(newConv.id);
     return newConv.id;
   };
 
+  /**
+   * Cancel any in-progress stream
+   */
+  const cancelStream = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  }, []);
+
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return;
+
+    // Cancel any existing stream
+    cancelStream();
 
     let convId = activeConversationId;
     let currentConversation = activeConversation;
@@ -54,101 +70,180 @@ export const useChat = () => {
       timestamp: new Date(),
     };
 
-    // Thêm tin nhắn user
+    // ID cho tin nhắn bot (tạo trước để append tokens)
+    const botMessageId = (Date.now() + 1).toString();
+
+    // Placeholder bot message (empty, streaming)
+    const botMessage: Message = {
+      id: botMessageId,
+      content: "",
+      role: "assistant",
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+
+    // Thêm tin nhắn user + placeholder bot
     setConversations((prev) =>
       prev.map((conv) =>
         conv.id === convId
           ? {
               ...conv,
-              messages: [...conv.messages, userMessage],
+              messages: [...conv.messages, userMessage, botMessage],
               title:
                 conv.messages.length === 0
                   ? content.slice(0, 30) + "..."
                   : conv.title,
             }
-          : conv
-      )
+          : conv,
+      ),
     );
 
     setLoading(true);
     setError(null);
 
-    try {
-      // Get the server conversation ID if exists
-      const serverConvId = conversations.find(
-        (c) => c.id === convId
-      )?.serverConversationId;
+    // Capture convId for closures
+    const capturedConvId = convId;
 
-      console.log("Sending message:", content);
-      console.log(
-        "Server conversation ID:",
-        serverConvId || "new conversation"
-      );
+    // Get the server conversation ID if exists
+    const serverConvId = conversations.find(
+      (c) => c.id === capturedConvId,
+    )?.serverConversationId;
 
-      // Send message with conversation_id for session continuity
-      const response = await sendMessage(content, serverConvId);
-      console.log("Response received:", response);
+    console.log("[Stream] Sending message:", content);
+    console.log("[Stream] Server conversation ID:", serverConvId || "new");
 
-      const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: response.response,
-        role: "assistant",
-        timestamp: new Date(),
-      };
+    const controller = sendMessageStream(content, serverConvId, {
+      onToken: (token: string) => {
+        // Append token to the bot message content
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === capturedConvId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map((msg) =>
+                    msg.id === botMessageId
+                      ? { ...msg, content: msg.content + token }
+                      : msg,
+                  ),
+                }
+              : conv,
+          ),
+        );
+      },
 
-      // Update conversation with bot message and server conversation ID
-      setConversations((prev) =>
-        prev.map((conv) =>
-          conv.id === convId
-            ? {
-                ...conv,
-                messages: [...conv.messages, botMessage],
-                // Store the server's conversation_id for future messages
-                serverConversationId: response.conversation_id,
-              }
-            : conv
-        )
-      );
+      onMetadata: (meta) => {
+        console.log("[Stream] Metadata:", meta);
+        // Store server session_id for future messages
+        if (meta.session_id) {
+          setConversations((prev) =>
+            prev.map((conv) =>
+              conv.id === capturedConvId
+                ? { ...conv, serverConversationId: meta.session_id }
+                : conv,
+            ),
+          );
+        }
+      },
 
-      // Clear error on success
-      setError(null);
-    } catch (err) {
-      // Use error message from chatAPI if available
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Không thể gửi tin nhắn. Vui lòng thử lại.";
+      onSources: (sources) => {
+        console.log("[Stream] Sources:", sources);
+        // Optionally attach sources to the bot message
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === capturedConvId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map((msg) =>
+                    msg.id === botMessageId
+                      ? {
+                          ...msg,
+                          sources: sources.map((s) => ({
+                            content: "",
+                            source: s,
+                          })),
+                        }
+                      : msg,
+                  ),
+                }
+              : conv,
+          ),
+        );
+      },
 
-      setError(errorMessage);
-      console.error("Error:", err);
-    } finally {
-      setLoading(false);
-    }
+      onDone: () => {
+        console.log("[Stream] Complete");
+        // Mark streaming as finished
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === capturedConvId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map((msg) =>
+                    msg.id === botMessageId
+                      ? { ...msg, isStreaming: false }
+                      : msg,
+                  ),
+                }
+              : conv,
+          ),
+        );
+        setLoading(false);
+        setError(null);
+        abortControllerRef.current = null;
+      },
+
+      onError: (err: Error) => {
+        console.error("[Stream] Error:", err);
+        // Update bot message with error or remove empty placeholder
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === capturedConvId
+              ? {
+                  ...conv,
+                  messages: conv.messages.map((msg) =>
+                    msg.id === botMessageId
+                      ? {
+                          ...msg,
+                          content:
+                            msg.content ||
+                            "Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại.",
+                          isStreaming: false,
+                        }
+                      : msg,
+                  ),
+                }
+              : conv,
+          ),
+        );
+        setError(err.message);
+        setLoading(false);
+        abortControllerRef.current = null;
+      },
+    });
+
+    abortControllerRef.current = controller;
   };
 
   const selectConversation = (id: string) => {
     setActiveConversationId(id);
-    setError(null); // Clear error when switching conversations
+    setError(null);
   };
 
   const deleteConversation = async (id: string) => {
     const conversation = conversations.find((c) => c.id === id);
 
-    // Try to delete from server if we have a server conversation ID
     if (conversation?.serverConversationId) {
       try {
         await apiDeleteConversation(conversation.serverConversationId);
         console.log(
           "Server conversation deleted:",
-          conversation.serverConversationId
+          conversation.serverConversationId,
         );
       } catch (err) {
         console.warn("Failed to delete server conversation:", err);
-        // Continue with local deletion even if server deletion fails
       }
     }
 
-    // Delete locally
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeConversationId === id) {
       setActiveConversationId(null);
@@ -157,7 +252,9 @@ export const useChat = () => {
 
   const renameConversation = (id: string, newTitle: string) => {
     setConversations((prev) =>
-      prev.map((conv) => (conv.id === id ? { ...conv, title: newTitle } : conv))
+      prev.map((conv) =>
+        conv.id === id ? { ...conv, title: newTitle } : conv,
+      ),
     );
   };
 
@@ -177,5 +274,6 @@ export const useChat = () => {
     deleteConversation,
     renameConversation,
     clearError,
+    cancelStream,
   };
 };

@@ -3,19 +3,212 @@ import type {
   ChatResponse,
   ChatRequest,
   ResetConversationResponse,
+  StreamMetadata,
 } from "../types/chat";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+// Use relative path for Vite proxy, or full URL for production
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 // Configure axios defaults
 axios.defaults.timeout = 60000; // 60 seconds timeout
 axios.defaults.headers.post["Content-Type"] = "application/json";
 
+// ============================================
+// SSE STREAMING CALLBACKS
+// ============================================
+
+export interface StreamCallbacks {
+  /** Called with each text token as it arrives */
+  onToken: (token: string) => void;
+  /** Called once when metadata (session_id, intent) is received */
+  onMetadata?: (meta: StreamMetadata) => void;
+  /** Called once when sources are available (RAG queries) */
+  onSources?: (sources: string[]) => void;
+  /** Called when the stream is fully complete */
+  onDone: () => void;
+  /** Called if an error occurs during streaming */
+  onError: (error: Error) => void;
+}
+
 /**
- * Send a chat message to the server
+ * Send a chat message and stream the response via SSE.
+ * Uses the native fetch API + ReadableStream to process events.
+ *
  * @param message - The user's message
- * @param conversationId - Optional conversation ID to continue existing conversation
- * @returns ChatResponse with response text, sources, and conversation_id
+ * @param conversationId - Optional session ID for continuity
+ * @param callbacks - Handlers for stream events
+ * @returns An AbortController so the caller can cancel the stream
+ */
+export const sendMessageStream = (
+  message: string,
+  conversationId: string | undefined,
+  callbacks: StreamCallbacks,
+): AbortController => {
+  const controller = new AbortController();
+  const endpoint = `${API_BASE_URL}/api/v1/chat/stream`;
+
+  const body: ChatRequest = {
+    message: message.trim(),
+    conversation_id: conversationId,
+  };
+
+  // Run the async streaming logic
+  (async () => {
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+          `HTTP ${response.status}: ${errorText || "Lỗi kết nối server"}`,
+        );
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error(
+          "ReadableStream không được hỗ trợ trên trình duyệt này.",
+        );
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Parse SSE lines from buffer
+        const lines = buffer.split("\n");
+        // Keep the last (possibly incomplete) line in the buffer
+        buffer = lines.pop() || "";
+
+        let currentEvent = "";
+        let dataLines: string[] = [];
+
+        for (const line of lines) {
+          if (line.startsWith("event: ")) {
+            // If we had a previous event with data, process it first
+            if (currentEvent && dataLines.length > 0) {
+              processSSEEvent(currentEvent, dataLines.join("\n"), callbacks);
+            }
+            currentEvent = line.slice(7).trim();
+            dataLines = [];
+          } else if (line.startsWith("data: ")) {
+            dataLines.push(line.slice(6));
+          } else if (line === "" && currentEvent && dataLines.length > 0) {
+            // Empty line = end of event
+            processSSEEvent(currentEvent, dataLines.join("\n"), callbacks);
+            currentEvent = "";
+            dataLines = [];
+          }
+        }
+
+        // Process any remaining event in progress
+        if (currentEvent && dataLines.length > 0) {
+          processSSEEvent(currentEvent, dataLines.join("\n"), callbacks);
+          currentEvent = "";
+          dataLines = [];
+        }
+      }
+
+      // Process any remaining buffer
+      if (buffer.trim()) {
+        const remaining = buffer.split("\n");
+        let currentEvent = "";
+        let dataLines: string[] = [];
+        for (const line of remaining) {
+          if (line.startsWith("event: ")) {
+            if (currentEvent && dataLines.length > 0) {
+              processSSEEvent(currentEvent, dataLines.join("\n"), callbacks);
+            }
+            currentEvent = line.slice(7).trim();
+            dataLines = [];
+          } else if (line.startsWith("data: ")) {
+            dataLines.push(line.slice(6));
+          }
+        }
+        if (currentEvent && dataLines.length > 0) {
+          processSSEEvent(currentEvent, dataLines.join("\n"), callbacks);
+        }
+      }
+
+      callbacks.onDone();
+    } catch (err: unknown) {
+      // Ignore abort errors (user cancelled)
+      if (err instanceof DOMException && err.name === "AbortError") {
+        callbacks.onDone();
+        return;
+      }
+
+      const error =
+        err instanceof Error
+          ? err
+          : new Error("Đã xảy ra lỗi không xác định khi streaming.");
+
+      console.error("[Stream Error]", error);
+      callbacks.onError(error);
+    }
+  })();
+
+  return controller;
+};
+
+/** Parse a single SSE event and call the appropriate callback */
+function processSSEEvent(
+  event: string,
+  data: string,
+  callbacks: StreamCallbacks,
+) {
+  switch (event) {
+    case "token":
+      callbacks.onToken(data);
+      break;
+    case "metadata":
+      try {
+        const meta: StreamMetadata = JSON.parse(data);
+        callbacks.onMetadata?.(meta);
+      } catch {
+        console.warn("Failed to parse metadata:", data);
+      }
+      break;
+    case "sources":
+      try {
+        const sources: string[] = JSON.parse(data);
+        callbacks.onSources?.(sources);
+      } catch {
+        console.warn("Failed to parse sources:", data);
+      }
+      break;
+    case "done":
+      // Will be handled by the reader loop ending
+      break;
+    case "error":
+      try {
+        const errData = JSON.parse(data);
+        callbacks.onError(new Error(errData.error || "Stream error"));
+      } catch {
+        callbacks.onError(new Error(data));
+      }
+      break;
+    default:
+      console.warn("Unknown SSE event:", event, data);
+  }
+}
+
+// ============================================
+// LEGACY NON-STREAMING API (kept for fallback)
+// ============================================
+
+/**
+ * Send a chat message to the server (non-streaming fallback)
  */
 export const sendMessage = async (
   message: string,

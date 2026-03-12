@@ -1,0 +1,23 @@
+services:
+  # 1. Qdrant - Vector Database (Chứa kiến thức RAG)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: uni_qdrant
+    ports:
+      - "6333:6333" # Port cho API
+    volumes:
+      - ./qdrant_data:/qdrant/storage
+    restart: always
+
+  # 2. MongoDB - App Database (Chứa lịch sử chat & metadata)
+  mongo:
+    image: mongo:7.0
+    container_name: uni_mongo
+    ports:
+      - "27018:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+    volumes:
+      - ./mongo_data:/data/db
+    restart: always

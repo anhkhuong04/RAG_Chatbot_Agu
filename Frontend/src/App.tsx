@@ -1,10 +1,11 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { LandingPage, ChatPage } from "./pages";
+import { LandingPage, ChatPage, AdminPage } from "./pages";
 
 /**
  * App Component - Router Setup
  * "/" - Landing Page (Homepage)
  * "/chat" - Chat Application
+ * "/admin" - Admin Dashboard
  */
 function App() {
   return (
@@ -15,6 +16,9 @@ function App() {
 
         {/* Chat Page - Chatbot Interface */}
         <Route path="/chat" element={<ChatPage />} />
+
+        {/* Admin Page - Knowledge Base Management */}
+        <Route path="/admin" element={<AdminPage />} />
       </Routes>
     </Router>
   );
