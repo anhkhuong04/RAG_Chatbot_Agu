@@ -5,18 +5,22 @@ import {
   DocumentList,
   PromptManager,
   Sidebar,
-  LoginForm,
-} from "../components/admin";
-import type { AdminTab } from "../components/admin";
-import { useAdmin, getDefaultFormData } from "../hooks/useAdmin";
-import { useAuth } from "../hooks/useAuth";
+} from "../features/admin/components";
+import type { AdminTab } from "../features/admin/components/Sidebar";
+import { getDefaultFormData } from "../features/admin/components/UploadForm";
+import { useDocuments } from "../features/admin/hooks/useDocuments";
+import { usePrompts } from "../features/admin/hooks/usePrompts";
+import { useAuthStore } from "../features/auth/store/useAuthStore";
+import type { UploadFormData } from "../types/admin";
+import type { PromptUpdatePayload } from "../features/admin/api/adminAPI";
+import LoginForm from "../features/auth/components/LoginForm";
 
 /**
  * Admin Page - Knowledge Base Management Dashboard
  * Sidebar layout with tab-based content routing.
  */
 const AdminPage = () => {
-  const { isAuthenticated, isLoggingIn, loginError, login, logout } = useAuth();
+  const { isAuthenticated, isLoggingIn, loginError, login, logout } = useAuthStore();
 
   if (!isAuthenticated) {
     return (
@@ -34,19 +38,64 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
     documents,
     isLoading,
     isUploading,
-    error,
+    uploadError,
     uploadSuccess,
+    deleteDocument,
+    refetchDocuments,
+    uploadDocument,
+    resetUploadState,
+  } = useDocuments();
+
+  const {
     prompts,
     isLoadingPrompts,
     promptError,
-    promptSuccess,
-    fetchDocuments,
-    handleUpload,
-    handleDelete,
-    clearMessages,
-    fetchPrompts,
-    handleUpdatePrompt,
-  } = useAdmin();
+    updateSuccess,
+    updatePrompt,
+    refetchPrompts,
+    resetUpdateState,
+  } = usePrompts();
+
+  // Compat assignments
+  const error = uploadError;
+  const promptSuccess = updateSuccess;
+  const fetchDocuments = async () => { await refetchDocuments(); };
+  const fetchPrompts = async () => { await refetchPrompts(); };
+
+  const handleUpload = async (formData: UploadFormData) => {
+    try {
+      await uploadDocument(formData);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleDelete = async (docUuid: string) => {
+    try {
+      await deleteDocument(docUuid);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const handleUpdatePrompt = async (
+    intentName: string,
+    payload: PromptUpdatePayload,
+  ) => {
+    try {
+      await updatePrompt({ intentName, payload });
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const clearMessages = () => {
+    resetUploadState();
+    resetUpdateState();
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">

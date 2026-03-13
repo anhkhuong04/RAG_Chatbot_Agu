@@ -8,8 +8,9 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-# Import ChatService
-from app.service.chat_service import ChatService
+# Import ChatService (from refactored package)
+from app.service.chat import ChatService
+from app.service.chat.intent_classifier import IntentClassifier
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
@@ -80,7 +81,7 @@ async def _sse_generator(chat_service: ChatService, session_id: str, message: st
     """
     try:
         # Detect intent before streaming
-        intent = chat_service._classify_intent(message)
+        intent = chat_service._intent_classifier.classify(message)
         sources: List[str] = []
 
         # Send metadata (session_id, intent) as the first event
@@ -93,8 +94,8 @@ async def _sse_generator(chat_service: ChatService, session_id: str, message: st
         # Route based on intent
         if intent == "QUERY_DOCS":
             # Standard RAG: load history, resolve coreferences, retrieve, send sources
-            history = chat_service._load_chat_history(session_id, limit=5)
-            resolved_msg = await chat_service._resolve_coreferences(message, history)
+            history = chat_service._history_manager.load_history(session_id, limit=5)
+            resolved_msg = await chat_service._coreference.resolve(message, history)
             nodes, sources = await chat_service._retrieve_and_rerank(resolved_msg)
             if sources:
                 sources_json = json.dumps(sources, ensure_ascii=False)

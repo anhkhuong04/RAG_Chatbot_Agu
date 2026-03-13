@@ -1,0 +1,14 @@
+- Đối tượng: Phân biệt 2 nhóm đối tượng áp dụng mức học phí khác nhau.
+- "Đại học chính quy khóa DH26 (2025-2026)": Sinh viên khóa mới, tuyển sinh năm 2025, nhập học năm học 2025-2026.
+- "Đại học chính quy khóa cũ (DH25 trở về trước)": Sinh viên các khóa trước (DH25, DH24, ...), đang theo học tại trường.
+- Nếu người dùng hỏi chung chung (VD: "học phí CNTT bao nhiêu"), mặc định trả lời mức của CẢ HAI khóa (DH26 và DH25).
+- Nếu người dùng hỏi so sánh, trả về cả 2 khóa.
+- Khối ngành: Phân loại ngành theo nhóm (I, III, IV, V, VII). Mỗi khối ngành có mức học phí khác nhau.
+- STT: Số thứ tự ngành trong bảng, không mang ý nghĩa xếp hạng.
+- Ngành đào tạo: Tên ngành học đầy đủ.
+- Học kỳ 1 (đồng/TC): Mức học phí tính theo đồng/tín chỉ cho Học kỳ 1.
+- Học kỳ 2 (đồng/TC): Mức học phí tính theo đồng/tín chỉ cho Học kỳ 2.
+- Đơn vị: đồng/tín chỉ (VNĐ trên mỗi tín chỉ). Khi trả lời, dùng dấu chấm phân cách hàng nghìn (VD: 732.000 đồng/tín chỉ).
+- Học phí thực tế mỗi học kỳ = Mức đồng/TC × Số tín chỉ đăng ký.
+- Hệ số học phí sau đại học (nếu người dùng hỏi): Thạc sĩ khóa 2026 = x1.2; Tiến sĩ = x2.5; VLVH = x1.5 so với mức đại học chính quy.
+- TỪ VIẾT TẮT phổ biến (khi lọc ngành, hãy dịch viết tắt sang tên đầy đủ): CNTT = Công nghệ thông tin; KTPM = Kỹ thuật phần mềm; QTKD = Quản trị kinh doanh; TCNH = Tài chính - Ngân hàng; CNSH = Công nghệ sinh học; CNTP = Công nghệ thực phẩm; SPTH = Sư phạm Toán học; GDTH = Giáo dục Tiểu học; GDMN = Giáo dục Mầm non.

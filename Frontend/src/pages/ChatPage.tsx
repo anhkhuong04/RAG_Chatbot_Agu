@@ -1,8 +1,9 @@
 import React from "react";
-import { useChat } from "../hooks/useChat";
-import Sidebar from "../components/chat/Sidebar";
-import ChatWindow from "../components/chat/ChatWindow";
-import MessageInput from "../components/chat/MessageInput";
+import { useChatStore } from "../features/chat/store/useChatStore";
+import { useChatStream } from "../features/chat/hooks/useChatStream";
+import Sidebar from "../features/chat/components/Sidebar";
+import ChatWindow from "../features/chat/components/ChatWindow";
+import MessageInput from "../features/chat/components/MessageInput";
 import "../styles/chat.css";
 
 /**
@@ -10,17 +11,22 @@ import "../styles/chat.css";
  */
 const ChatPage: React.FC = () => {
   const {
-    conversations,
-    activeConversation,
-    activeConversationId,
     loading,
     error,
     handleSendMessage,
+  } = useChatStream();
+
+  const {
+    conversations,
+    activeConversationId,
+    getActiveConversation,
     createNewConversation,
     selectConversation,
     deleteConversation,
     renameConversation,
-  } = useChat();
+  } = useChatStore();
+
+  const activeConversation = getActiveConversation();
 
   const currentYear = new Date().getFullYear();
   const hasMessages = (activeConversation?.messages?.length || 0) > 0;
@@ -34,8 +40,8 @@ const ChatPage: React.FC = () => {
     },
     {
       icon: "📚",
-      text: "Có bao nhiêu ngành nghề đào tạo?",
-      message: "AGU có bao nhiêu ngành đào tạo, gồm những ngành nào?",
+      text: "Học bổng dành cho tân sinh viên?",
+      message: "Học bổng dành cho tân sinh viên?",
     },
     {
       icon: "📊",
@@ -44,8 +50,8 @@ const ChatPage: React.FC = () => {
     },
     {
       icon: "💰",
-      text: "Học phí bao nhiêu cho 1 năm học?",
-      message: "Học phí bao nhiêu cho 1 năm học ngành CNTT?",
+      text: "Học phí dự kiến bao nhiêu cho 1 năm học?",
+      message: "Học phí dự kiến bao nhiêu cho 1 năm học ngành CNTT?",
     },
   ];
 
@@ -73,11 +79,10 @@ const ChatPage: React.FC = () => {
 
         {/* Welcome Screen - Hiển thị khi chưa có tin nhắn */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-center px-4 bg-white transition-all duration-500 ease-out ${
-            hasMessages
+          className={`absolute inset-0 flex flex-col items-center justify-center px-4 bg-white transition-all duration-500 ease-out ${hasMessages
               ? "opacity-0 pointer-events-none scale-95"
               : "opacity-100 pointer-events-auto scale-100"
-          }`}
+            }`}
         >
           <div className="text-center mb-8 welcome-content">
             <div className="empty-state-icon text-7xl mb-6">🎓</div>
@@ -122,11 +127,10 @@ const ChatPage: React.FC = () => {
 
         {/* Chat Window - Hiển thị khi có tin nhắn */}
         <div
-          className={`flex-1 flex flex-col overflow-hidden transition-all duration-500 ease-out ${
-            hasMessages
+          className={`flex-1 flex flex-col overflow-hidden transition-all duration-500 ease-out ${hasMessages
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-4 pointer-events-none"
-          }`}
+            }`}
         >
           <ChatWindow
             messages={activeConversation?.messages || []}

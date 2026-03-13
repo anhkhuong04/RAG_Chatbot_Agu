@@ -22,7 +22,7 @@ SCORE_INDICATORS = [
 # --- Fee-specific indicators (→ QUERY_FEES) ---
 FEE_INDICATORS = [
     "học phí", "hoc phi", "đóng tiền", "tín chỉ", "mức thu",
-    "chi phí học", "aun-qa", "kiểm định", "miễn giảm", "học bổng",
+    "chi phí học", "aun-qa", "kiểm định", "miễn giảm",
 ]
 
 # --- General query indicators (→ QUERY_DOCS) ---
