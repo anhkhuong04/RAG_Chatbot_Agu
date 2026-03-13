@@ -1,0 +1,8 @@
+# Ignore generated or data files in GitHub language statistics
+Backend/data/** linguist-vendored
+*.rtf linguist-vendored
+*.pdf linguist-vendored
+*.csv linguist-vendored
+*.docx linguist-vendored
+*.jpeg linguist-vendored
+*.png linguist-vendored
