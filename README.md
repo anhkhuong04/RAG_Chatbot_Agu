@@ -6,7 +6,6 @@ The chatbot is designed to support:
 - 🤖 Automated responses to admission-related FAQs
 - 📊 Intelligent tabular data extraction for admission scores and tuition fees using Pandas Query Engines
 - 🛡️ Reduced hallucination through retrieval-based grounding and strict system prompts
-- 🏗️ A scalable **Clean Architecture** for the backend and **Feature-Sliced Design (FSD)** for the frontend
 
 ---
 
@@ -41,17 +40,16 @@ The React frontend isolates code strictly by feature domains, eliminating monoli
 ## 🛠️ Tech Stack
 
 ### Backend
-- **Framework:** FastAPI (Python 3.10+)
+- **Framework:** FastAPI (Python 3.12)
 - **RAG Orchestrator:** LlamaIndex
 - **Vector Database:** Qdrant
 - **Conversation State DB:** MongoDB
-- **LLM / Embeddings:** Gemini 2.0 Flash / OpenAI
+- **LLM / Embeddings:** OpenAI
 - **Data Parsing:** LlamaParse (for complex PDF & tables)
 
 ### Frontend
-- **Framework:** React 18 + Vite + TypeScript
-- **Styling:** Tailwind CSS + Lucide Icons
-- **Global State:** Zustand (Local Storage persisted)
+- **Framework:** React + Vite + TypeScript
+- **Styling:** Tailwind CSS
 - **Data Fetching:** TanStack React Query
 - **Routing:** React Router DOM
 
