@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from llama_index.core import Settings
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
+from app.core.config import get_settings
 
 # Load environment variables
 load_dotenv()
@@ -12,24 +13,28 @@ def init_settings():
     Initialize LlamaIndex global settings with OpenAI LLM and Embeddings.
     Call this once at application startup.
     """
+    app_settings = get_settings()
+    llm_cfg = app_settings.llm
+
     # Configure LLM (for chat/generation)
     Settings.llm = OpenAI(
-        model="gpt-4o-mini",
-        api_key=os.getenv("OPENAI_API_KEY"),
-        temperature=0.1
+        model=llm_cfg.llm_model,
+        api_key=llm_cfg.openai_api_key or os.getenv("OPENAI_API_KEY"),
+        temperature=llm_cfg.llm_temperature
     )
     
     # Configure Embedding model (for vector search)
     Settings.embed_model = OpenAIEmbedding(
-        model="text-embedding-3-small",
-        api_key=os.getenv("OPENAI_API_KEY")
+        model=llm_cfg.embedding_model,
+        dimensions=llm_cfg.embedding_dimension,
+        api_key=llm_cfg.openai_api_key or os.getenv("OPENAI_API_KEY")
     )
     
     # Configure chunking defaults
     Settings.chunk_size = 1024
     Settings.chunk_overlap = 200
     
-    print("✅ LlamaIndex Settings initialized (OpenAI GPT-4o-mini + text-embedding-3-small)")
+    print(f"✅ LlamaIndex Settings initialized ({llm_cfg.llm_model} + {llm_cfg.embedding_model}, dim={llm_cfg.embedding_dimension})")
 
 
 def get_llm():

@@ -1,0 +1,113 @@
+{
+  "count": 9,
+  "documents": [
+    {
+      "doc_uuid": "351d3398-0eea-477f-b28f-17af86c094f7",
+      "filename": "Bảng Phụ Lục.pdf",
+      "metadata": {
+        "year": 2026,
+        "category": "Tuyển sinh",
+        "description": "Bảng phụ lục tuyển sinh"
+      },
+      "status": "INDEXED",
+      "chunk_count": 9,
+      "storage_type": "qdrant"
+    },
+    {
+      "doc_uuid": "8e3e7f1a-541b-48b7-a4c8-34a4a2560a9e",
+      "filename": "DGNL.docx",
+      "metadata": {
+        "year": 2026,
+        "category": "Tuyển sinh",
+        "description": "Thông tin kỳ thi đánh giá năng lực 2026"
+      },
+      "status": "INDEXED",
+      "chunk_count": 1,
+      "storage_type": "qdrant"
+    },
+    {
+      "doc_uuid": "dfac6a3d-b05d-467e-a452-166a6d194e94",
+      "filename": "Thông tin ts_2026.rtf",
+      "metadata": {
+        "year": 2026,
+        "category": "Tuyển sinh",
+        "description": "Thông tin tuyển sinh 2026"
+      },
+      "status": "INDEXED",
+      "chunk_count": 6,
+      "storage_type": "qdrant"
+    },
+    {
+      "doc_uuid": "e14de4b1-d602-47eb-9415-6229bb891a04",
+      "filename": "diem_chuan_2025.pdf",
+      "metadata": {
+        "year": 2025,
+        "category": "Điểm chuẩn",
+        "description": "Điểm chuẩn tuyển sinh 2025"
+      },
+      "status": "INDEXED",
+      "csv_path": "D:\\RAG Chatbot\\Backend\\data\\structured\\diem_chuan_2025.csv",
+      "storage_type": "csv"
+    },
+    {
+      "doc_uuid": "67e4e21e-c0ce-48eb-98a1-36ee4233814c",
+      "filename": "CTDT_Fit.docx",
+      "metadata": {
+        "year": 2025,
+        "category": "Khác",
+        "description": "Chương trình đào tạo CNTT"
+      },
+      "status": "INDEXED",
+      "chunk_count": 2,
+      "storage_type": "qdrant"
+    },
+    {
+      "doc_uuid": "f1369e37-6b92-48e1-8cb3-3b7689683f67",
+      "filename": "Introduce FIT.txt",
+      "metadata": {
+        "year": 2025,
+        "category": "Khác",
+        "description": "Giới thiệu khoa CNTT"
+      },
+      "status": "INDEXED",
+      "chunk_count": 1,
+      "storage_type": "qdrant"
+    },
+    {
+      "doc_uuid": "7551575a-ce51-4116-9cdd-23f01eab3df2",
+      "filename": "Thông tin liên hệ -.docx",
+      "metadata": {
+        "year": 2026,
+        "category": "Tuyển sinh",
+        "description": null
+      },
+      "status": "INDEXED",
+      "chunk_count": 1,
+      "storage_type": "qdrant"
+    },
+    {
+      "doc_uuid": "073ed778-dcd6-48f1-b4ba-7f553cd74c95",
+      "filename": "Mức thu học phí tuyển sinh 2026.pdf",
+      "metadata": {
+        "year": 2026,
+        "category": "Tuyển sinh",
+        "description": "Mức học phí dự kiến tuyển sinh 2026"
+      },
+      "status": "INDEXED",
+      "chunk_count": 1,
+      "storage_type": "qdrant"
+    },
+    {
+      "doc_uuid": "e4f6ee78-b525-4591-808f-3af299f3e91e",
+      "filename": "QĐ mức thu học phí HKII NH 25-26_ĐC.pdf",
+      "metadata": {
+        "year": 2025,
+        "category": "Học phí",
+        "description": "Mức thu học phí năm 2025-2026"
+      },
+      "status": "INDEXED",
+      "csv_path": "D:\\RAG Chatbot\\Backend\\data\\structured\\hoc_phi_bang_1_2025.csv",
+      "storage_type": "csv"
+    }
+  ]
+}

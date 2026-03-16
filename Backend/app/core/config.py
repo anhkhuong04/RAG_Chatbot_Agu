@@ -24,13 +24,13 @@ class RetrievalSettings(BaseSettings):
         description="Weight for dense search (0=sparse only, 1=dense only)"
     )
     dense_top_k: int = Field(
-        default=10,
+        default=20,
         ge=1,
         le=50,
         description="Number of results from dense retriever"
     )
     sparse_top_k: int = Field(
-        default=10,
+        default=20,
         ge=1,
         le=50,
         description="Number of results from sparse (BM25) retriever"
@@ -46,7 +46,7 @@ class RetrievalSettings(BaseSettings):
         description="Cross-encoder model for reranking"
     )
     rerank_top_n: int = Field(
-        default=5,
+        default=3,
         ge=1,
         le=20,
         description="Number of top results after reranking"
@@ -128,6 +128,11 @@ class LLMSettings(BaseSettings):
     embedding_model: str = Field(
         default="text-embedding-3-small",
         description="Embedding model name"
+    )
+    embedding_dimension: int = Field(
+        default=1536,
+        ge=1,
+        description="Embedding vector dimension"
     )
     
     class Config:

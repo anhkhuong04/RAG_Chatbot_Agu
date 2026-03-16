@@ -1,17 +1,3 @@
-"""
-ChatService — Orchestrator for RAG-based chat interactions.
-
-This is the main entry point that coordinates:
-  - Intent classification
-  - Chat history management
-  - Coreference resolution
-  - CSV query engines (điểm chuẩn, học phí)
-  - RAG retrieval pipeline
-  - Response synthesis
-
-Refactored from the original monolithic chat_service.py (~2000 lines)
-into this ~300-line orchestrator that delegates to focused modules.
-"""
 import os
 import json
 import logging
@@ -269,7 +255,7 @@ class ChatService:
 
         try:
             history = self._history_manager.load_history(session_id, limit=5)
-            intent = self._intent_classifier.classify(message)
+            intent = await self._intent_classifier.classify(message)
             print(f"Intent classified as: {intent}")
 
             # Check for future year queries
@@ -317,7 +303,7 @@ class ChatService:
 
             else:  # QUERY_DOCS or fallback
                 resolved = await self._coreference.resolve(message, history)
-                response_text, sources = await self._handle_rag_query(resolved)
+                response_text, sources = await self._handle_rag_query(resolved, intent)
 
             # Save to history
             self._history_manager.save_message(session_id, "user", message)
@@ -344,7 +330,7 @@ class ChatService:
 
         try:
             history = self._history_manager.load_history(session_id, limit=5)
-            intent = self._intent_classifier.classify(message)
+            intent = await self._intent_classifier.classify(message)
             print(f"[STREAM] Intent classified as: {intent}")
 
             # Check for future year queries
@@ -392,6 +378,7 @@ class ChatService:
 
             else:
                 resolved = await self._coreference.resolve(message, history)
+                # Pass intent for prompt selection in RAG synthesis
                 nodes, sources = await self._retrieve_and_rerank(resolved)
 
                 if not nodes:
@@ -473,16 +460,16 @@ class ChatService:
         sources = self._response_handler.extract_sources(final_nodes) if final_nodes else []
         return final_nodes, sources
 
-    async def _handle_rag_query(self, message: str) -> tuple[str, List[str]]:
+    async def _handle_rag_query(self, message: str, intent: str = "QUERY_DOCS") -> tuple[str, List[str]]:
         """Handle knowledge-base queries using Advanced RAG."""
         if self._hybrid_retriever or self._reranker:
             try:
-                return await self._handle_advanced_rag_query(message)
+                return await self._handle_advanced_rag_query(message, intent)
             except Exception as e:
                 logger.error(f"Advanced RAG failed, falling back to basic: {e}")
         return await self._handle_basic_rag_query(message)
 
-    async def _handle_advanced_rag_query(self, message: str) -> tuple[str, List[str]]:
+    async def _handle_advanced_rag_query(self, message: str, intent: str = "QUERY_DOCS") -> tuple[str, List[str]]:
         """Handle queries using Advanced RAG pipeline."""
         index = self._get_index()
         if index is None:
@@ -535,11 +522,10 @@ class ChatService:
                 "Vui lòng thử lại với câu hỏi khác hoặc liên hệ phòng Tuyển sinh.", [],
             )
 
-        detected_intent = "general"
-        if rewritten_result and hasattr(rewritten_result, "detected_intent"):
-            detected_intent = rewritten_result.detected_intent
+        # Use fine-grained intent from the unified IntentClassifier
+        fine_intent = IntentClassifier.get_fine_intent(intent)
 
-        response_text = await self._response_handler.synthesize_response(message, final_nodes, detected_intent)
+        response_text = await self._response_handler.synthesize_response(message, final_nodes, fine_intent)
         sources = self._response_handler.extract_sources(final_nodes)
         return response_text, sources
 

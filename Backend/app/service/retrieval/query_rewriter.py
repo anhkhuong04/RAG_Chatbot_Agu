@@ -1,8 +1,6 @@
 import asyncio
 import logging
-import re
-from difflib import SequenceMatcher
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Any
 from dataclasses import dataclass
 
 from llama_index.core import Settings
@@ -29,17 +27,43 @@ Nhiệm vụ: Phân tích và viết lại câu hỏi của người dùng để
 
 Quy tắc:
 1. Giữ nguyên ý nghĩa gốc của câu hỏi
-2. Chuẩn hóa thuật ngữ (VD: "CNTT" → "Công nghệ thông tin")
+2. Chuẩn hóa thuật ngữ nếu người dùng đã nêu rõ (VD: "CNTT" → "Công nghệ thông tin")
 3. Thêm context nếu câu hỏi mơ hồ
 4. Loại bỏ từ thừa, giữ keywords quan trọng
 5. Nếu có năm cụ thể, giữ nguyên năm đó
 6. Nếu không có năm, KHÔNG thêm năm vào
+7. KHÔNG tự thêm ngành cụ thể nếu câu gốc không nêu ngành (đặc biệt không tự chèn "Công nghệ thông tin"/"CNTT")
+8. Với câu hỏi chính sách chung của trường (học bổng, miễn giảm, quy chế, điều kiện), giữ phạm vi toàn trường, không thu hẹp về 1 ngành
 
 Ví dụ:
 - "điểm cntt" → "Điểm chuẩn ngành Công nghệ thông tin"
 - "học phí bao nhiêu" → "Mức học phí các ngành đào tạo"
 - "đăng ký xét tuyển như nào" → "Quy trình đăng ký xét tuyển đại học"
+- "học bổng có không" → "Chính sách học bổng tuyển sinh của trường"
 """
+
+    # Prevent rewrite from injecting specific major when original query is generic.
+    _CNTT_TERMS = [
+        "cntt",
+        "công nghệ thông tin",
+        "cong nghe thong tin",
+        "it",
+    ]
+
+    _GENERAL_POLICY_TERMS = [
+        "học bổng",
+        "hoc bong",
+        "miễn giảm",
+        "mien giam",
+        "quy chế",
+        "quy che",
+        "quy định",
+        "quy dinh",
+        "điều kiện",
+        "dieu kien",
+        "tuyển sinh",
+        "tuyen sinh",
+    ]
 
     EXPAND_SYSTEM_PROMPT = """Bạn là chuyên gia tìm kiếm thông tin tuyển sinh đại học.
 
@@ -98,11 +122,13 @@ Quy tắc:
         Full query rewriting pipeline.
         Runs rewrite, expansion, and keyword extraction in parallel via asyncio.gather().
         
+        Note: Intent detection is no longer done here — use IntentClassifier instead.
+        
         Args:
             query: Original user query
             
         Returns:
-            RewrittenQuery with all enhancements
+            RewrittenQuery with all enhancements (detected_intent defaults to "general")
         """
         logger.info(f"📝 Rewriting query: {query[:50]}...")
         
@@ -117,7 +143,7 @@ Quy tắc:
         
         try:
             # Build coroutine list for parallel execution
-            tasks: Dict[str, Any] = {}
+            tasks: dict[str, Any] = {}
             coros = []
             task_keys = []
 
@@ -163,9 +189,6 @@ Quy tắc:
                 else:
                     result.extracted_keywords = tasks["keywords"]
                     logger.debug(f"   Keywords: {result.extracted_keywords}")
-
-            # Detect intent (sync, lightweight — no need to parallelize)
-            result.detected_intent = self._detect_intent(query)
             
             logger.info(
                 f"✅ Query rewritten: '{query[:30]}...' → '{result.rewritten[:30]}...' "
@@ -219,8 +242,31 @@ Quy tắc:
         # Fallback to original if response is empty or too different
         if not rewritten or len(rewritten) < 3:
             return query
+
+        # Guardrail: do not allow overly-specific major injection for generic questions.
+        if self._is_over_specific_rewrite(query, rewritten):
+            logger.info("Rewrite guard triggered: keeping original query to avoid major overfitting")
+            return query
         
         return rewritten
+
+    @staticmethod
+    def _contains_any(text: str, terms: List[str]) -> bool:
+        return any(term in text for term in terms)
+
+    def _is_over_specific_rewrite(self, original: str, rewritten: str) -> bool:
+        """
+        Detect rewrite that injects CNTT/specific-major terms while the original
+        asks a generic policy question at school scope.
+        """
+        o = original.lower()
+        r = rewritten.lower()
+
+        original_has_cntt = self._contains_any(o, self._CNTT_TERMS)
+        rewritten_has_cntt = self._contains_any(r, self._CNTT_TERMS)
+        original_is_general_policy = self._contains_any(o, self._GENERAL_POLICY_TERMS)
+
+        return (not original_has_cntt) and rewritten_has_cntt and original_is_general_policy
     
     async def _expand_query(self, query: str) -> List[str]:
         """
@@ -268,86 +314,6 @@ Quy tắc:
                 keywords.append(kw)
         
         return keywords
-    
-    # Similarity threshold for fuzzy matching (0.0 – 1.0)
-    _FUZZY_THRESHOLD = 0.75
-
-    # Pre-compiled regex patterns per intent (word-boundary aware)
-    _INTENT_PATTERNS: Dict[str, re.Pattern] = {
-        "diem_chuan": re.compile(
-            r"\b(điểm\s*chuẩn|diem\s*chuan|điểm\s*trúng\s*tuyển|diem\s*trung\s*tuyen"
-            r"|điểm\s*đỗ|diem\s*do|điểm\s*đậu|diem\s*dau|điểm\s*xét\s*tuyển|diem\s*xet\s*tuyen)\b",
-            re.IGNORECASE,
-        ),
-        "hoc_phi": re.compile(
-            r"\b(học\s*phí|hoc\s*phi|chi\s*phí|chi\s*phi|tiền\s*học|tien\s*hoc"
-            r"|lệ\s*phí|le\s*phi|học\s*bổng|hoc\s*bong|miễn\s*giảm|mien\s*giam)\b",
-            re.IGNORECASE,
-        ),
-        "tuyen_sinh": re.compile(
-            r"\b(tuyển\s*sinh|tuyen\s*sinh|xét\s*tuyển|xet\s*tuyen|đăng\s*ký|dang\s*ky"
-            r"|nộp\s*hồ\s*sơ|nop\s*ho\s*so|nguyện\s*vọng|nguyen\s*vong|chỉ\s*tiêu|chi\s*tieu)\b",
-            re.IGNORECASE,
-        ),
-        "nganh_hoc": re.compile(
-            r"\b(ngành|nganh|chuyên\s*ngành|chuyen\s*nganh|chương\s*trình|chuong\s*trinh"
-            r"|đào\s*tạo|dao\s*tao|mã\s*ngành|ma\s*nganh)\b",
-            re.IGNORECASE,
-        ),
-        "quy_che": re.compile(
-            r"\b(quy\s*chế|quy\s*che|quy\s*định|quy\s*dinh|điều\s*kiện|dieu\s*kien"
-            r"|yêu\s*cầu|yeu\s*cau|tiêu\s*chuẩn|tieu\s*chuan)\b",
-            re.IGNORECASE,
-        ),
-    }
-
-    # Canonical keyword list per intent – used for fuzzy fallback
-    _INTENT_KEYWORDS: Dict[str, List[str]] = {
-        "diem_chuan": ["điểm chuẩn", "điểm trúng tuyển", "điểm đỗ", "điểm đậu", "điểm xét tuyển"],
-        "hoc_phi": ["học phí", "chi phí", "tiền học", "lệ phí", "học bổng", "miễn giảm"],
-        "tuyen_sinh": ["tuyển sinh", "xét tuyển", "đăng ký", "nộp hồ sơ", "nguyện vọng", "chỉ tiêu"],
-        "nganh_hoc": ["ngành", "chuyên ngành", "chương trình", "đào tạo", "mã ngành"],
-        "quy_che": ["quy chế", "quy định", "điều kiện", "yêu cầu", "tiêu chuẩn"],
-    }
-
-    def _detect_intent(self, query: str) -> str:
-        """
-        Intent detection using regex with word boundaries, falling back to
-        fuzzy matching (difflib) to handle typos and no-diacritics input.
-        """
-        # 1. Fast path – regex match (handles exact, no-diacritics, extra spaces)
-        for intent, pattern in self._INTENT_PATTERNS.items():
-            if pattern.search(query):
-                return intent
-
-        # 2. Slow path – fuzzy matching for light typos
-        query_lower = query.lower()
-        best_intent = "general"
-        best_score = 0.0
-
-        for intent, keywords in self._INTENT_KEYWORDS.items():
-            for kw in keywords:
-                score = SequenceMatcher(None, query_lower, kw.lower()).ratio()
-                if score > best_score:
-                    best_score = score
-                    best_intent = intent
-
-            # Also try matching each word-window of the query against each keyword
-            words = query_lower.split()
-            for kw in keywords:
-                kw_lower = kw.lower()
-                kw_word_count = len(kw_lower.split())
-                for i in range(len(words) - kw_word_count + 1):
-                    window = " ".join(words[i : i + kw_word_count])
-                    score = SequenceMatcher(None, window, kw_lower).ratio()
-                    if score > best_score:
-                        best_score = score
-                        best_intent = intent
-
-        if best_score >= self._FUZZY_THRESHOLD:
-            return best_intent
-
-        return "general"
     
     async def get_all_queries(self, query: str) -> List[str]:
         """

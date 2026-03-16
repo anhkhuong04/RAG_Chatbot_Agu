@@ -1,13 +1,10 @@
-"""
-Intent Classification module.
-
-Classifies user messages into one of:
-  CHITCHAT, QUERY_DOCS, QUERY_SCORES, QUERY_FEES, CAREER_ADVICE
-
-Extracted from ChatService._classify_intent and ChatService._check_future_year_query.
-"""
 import re
 import logging
+from difflib import SequenceMatcher
+from typing import Dict, List, Optional
+
+from llama_index.core import Settings
+from llama_index.core.llms import ChatMessage, MessageRole
 
 from app.service.prompts import (
     CHITCHAT_KEYWORDS,
@@ -20,22 +17,111 @@ from app.service.prompts import (
 
 logger = logging.getLogger(__name__)
 
+# --------------------------------------------------------------------------
+# LLM classification prompt
+# --------------------------------------------------------------------------
+
+INTENT_CLASSIFY_PROMPT = """\
+Bạn là bộ phân loại ý định (intent classifier) cho Chatbot tư vấn tuyển sinh Đại học An Giang.
+
+Phân loại câu hỏi của người dùng vào **đúng 1** trong các loại sau:
+- QUERY_SCORES — hỏi về điểm chuẩn, điểm trúng tuyển, điểm đầu vào, điểm đỗ
+- QUERY_FEES — hỏi về học phí, chi phí, lệ phí, tín chỉ, 
+- CAREER_ADVICE — hỏi về cơ hội việc làm, hướng nghiệp, nghề nghiệp, ra trường làm gì
+- CHITCHAT — chào hỏi, cảm ơn, tạm biệt, small talk
+- QUERY_DOCS — tất cả câu hỏi khác về tuyển sinh, ngành học, quy chế, thông tin chung, học bổng, miễn giảm
+
+Quy tắc:
+1. Chỉ trả lời DUY NHẤT 1 từ: QUERY_SCORES hoặc QUERY_FEES hoặc CAREER_ADVICE hoặc CHITCHAT hoặc QUERY_DOCS
+2. Không giải thích, không thêm bất kỳ ký tự nào khác
+3. Khi câu hỏi mơ hồ, ưu tiên QUERY_DOCS"""
+
+# --------------------------------------------------------------------------
+# Regex patterns (migrated from QueryRewriter._detect_intent)
+# --------------------------------------------------------------------------
+
+_INTENT_PATTERNS: Dict[str, re.Pattern] = {
+    "QUERY_SCORES": re.compile(
+        r"\b(điểm\s*chuẩn|diem\s*chuan|điểm\s*trúng\s*tuyển|diem\s*trung\s*tuyen"
+        r"|điểm\s*đỗ|diem\s*do|điểm\s*đậu|diem\s*dau|điểm\s*xét\s*tuyển|diem\s*xet\s*tuyen"
+        r"|điểm\s*đầu\s*vào|diem\s*dau\s*vao)\b",
+        re.IGNORECASE,
+    ),
+    "QUERY_FEES": re.compile(
+        r"\b(học\s*phí|hoc\s*phi|chi\s*phí|chi\s*phi|tiền\s*học|tien\s*hoc"
+        r"|lệ\s*phí|le\s*phi"
+        r"|tín\s*chỉ|tin\s*chi)\b",
+        re.IGNORECASE,
+    ),
+    "CAREER_ADVICE": re.compile(
+        r"\b(cơ\s*hội\s*việc\s*làm|hướng\s*nghiệp|ra\s*trường|làm\s*nghề\s*gì"
+        r"|việc\s*làm|nghề\s*nghiệp|triển\s*vọng|ra\s*làm\s*gì)\b",
+        re.IGNORECASE,
+    ),
+    "QUERY_DOCS": re.compile(
+        r"\b(tuyển\s*sinh|tuyen\s*sinh|xét\s*tuyển|xet\s*tuyen|đăng\s*ký|dang\s*ky"
+        r"|nộp\s*hồ\s*sơ|nop\s*ho\s*so|nguyện\s*vọng|nguyen\s*vong|chỉ\s*tiêu|chi\s*tieu"
+        r"|ngành|nganh|chuyên\s*ngành|chuyen\s*nganh|chương\s*trình|chuong\s*trinh"
+        r"|đào\s*tạo|dao\s*tao|mã\s*ngành|ma\s*nganh"
+        r"|quy\s*chế|quy\s*che|quy\s*định|quy\s*dinh|điều\s*kiện|dieu\s*kien"
+        r"|học\s*bổng|hoc\s*bong|miễn\s*giảm|mien\s*giam)\b",
+        re.IGNORECASE,
+    ),
+}
+
+# Canonical keyword list per intent — used for fuzzy fallback
+_FUZZY_KEYWORDS: Dict[str, List[str]] = {
+    "QUERY_SCORES": ["điểm chuẩn", "điểm trúng tuyển", "điểm đỗ", "điểm đậu", "điểm xét tuyển"],
+    "QUERY_FEES": ["học phí", "chi phí", "tiền học", "lệ phí"],
+    "CAREER_ADVICE": ["cơ hội việc làm", "hướng nghiệp", "nghề nghiệp", "ra trường", "việc làm"],
+    "QUERY_DOCS": [
+        "tuyển sinh", "xét tuyển", "đăng ký", "nộp hồ sơ", "nguyện vọng", "chỉ tiêu",
+        "ngành", "chuyên ngành", "chương trình", "đào tạo", "mã ngành",
+        "quy chế", "quy định", "điều kiện", "yêu cầu",  "học bổng", "miễn giảm"
+    ],
+}
+
+_FUZZY_THRESHOLD = 0.75
+
+# Map from the fine-grained intent names (used by QueryRewriter/prompt system)
+# to the routing intent names used by ChatService.
+FINE_TO_ROUTING: Dict[str, str] = {
+    "diem_chuan": "QUERY_SCORES",
+    "hoc_phi": "QUERY_FEES",
+    "tuyen_sinh": "QUERY_DOCS",
+    "nganh_hoc": "QUERY_DOCS",
+    "quy_che": "QUERY_DOCS",
+    "career_advice": "CAREER_ADVICE",
+    "general": "QUERY_DOCS",
+}
+
+# Reverse: routing intent → fine-grained intent (for prompt selection)
+ROUTING_TO_FINE: Dict[str, str] = {
+    "QUERY_SCORES": "diem_chuan",
+    "QUERY_FEES": "hoc_phi",
+    "CAREER_ADVICE": "career_advice",
+    "QUERY_DOCS": "general",
+    "CHITCHAT": "general",
+}
+
+# --------------------------------------------------------------------------
+# Valid intents returned by LLM
+# --------------------------------------------------------------------------
+
+_VALID_INTENTS = {"CHITCHAT", "QUERY_DOCS", "QUERY_SCORES", "QUERY_FEES", "CAREER_ADVICE"}
+
 
 class IntentClassifier:
-    """Stateless intent classifier using keyword / indicator matching."""
+    """Hybrid intent classifier: keyword → regex/fuzzy → LLM fallback."""
 
-    def classify(self, message: str) -> str:
+    async def classify(self, message: str) -> str:
         """
-        Classify user message intent using multi-factor analysis.
+        Classify user message intent using a 3-step hybrid approach.
 
         Priority (highest first):
-        1. Score-specific indicators → QUERY_SCORES
-        2. Fee-specific indicators → QUERY_FEES
-        3. Career advice indicators → CAREER_ADVICE
-        4. General query indicators → QUERY_DOCS
-        5. Message length (long = QUERY_DOCS)
-        6. Chitchat keywords (short msgs only) → CHITCHAT
-        7. Default → QUERY_DOCS
+        1. Keyword fast-path (deterministic, instant)
+        2. Regex + fuzzy matching (instant, handles typos/no-diacritics)
+        3. LLM fallback (async, handles novel phrasing)
 
         Args:
             message: User's message
@@ -43,49 +129,171 @@ class IntentClassifier:
         Returns:
             One of: "CHITCHAT", "QUERY_DOCS", "QUERY_SCORES", "QUERY_FEES", "CAREER_ADVICE"
         """
+        # Step 1: Keyword fast-path (existing logic — instant)
+        keyword_result = self._classify_by_keywords(message)
+        if keyword_result is not None:
+            logger.debug(f"Intent (keyword): {keyword_result}")
+            return keyword_result
+
+        # Step 2: Regex + fuzzy matching (instant)
+        regex_result = self._classify_by_regex_fuzzy(message)
+        if regex_result is not None:
+            logger.debug(f"Intent (regex/fuzzy): {regex_result}")
+            return regex_result
+
+        # Step 3: LLM fallback (async)
+        llm_result = await self._classify_by_llm(message)
+        logger.info(f"Intent (LLM): {llm_result} for '{message[:50]}...'")
+        return llm_result
+
+    # ------------------------------------------------------------------
+    # Step 1: Keyword fast-path
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _classify_by_keywords(message: str) -> Optional[str]:
+        """
+        Keyword-based classification for clear-cut cases.
+        Returns None if no confident match — signals to try next step.
+        """
         message_lower = message.lower().strip()
         words = message_lower.split()
         word_count = len(words)
 
-        # Priority 1: Check for SCORE-specific indicators
+        # Priority 1: Score-specific indicators
         for indicator in SCORE_INDICATORS:
             if indicator in message_lower:
-                logger.debug(f"Score indicator found: '{indicator}' → QUERY_SCORES")
                 return "QUERY_SCORES"
 
-        # Priority 2: Check for FEE-specific indicators
+        # Priority 2: Fee-specific indicators
         # Exception: "dự kiến" → force QUERY_DOCS (RAG) vì dữ liệu CSV chỉ có số chính thức
         if "dự kiến" not in message_lower:
             for indicator in FEE_INDICATORS:
                 if indicator in message_lower:
-                    logger.debug(f"Fee indicator found: '{indicator}' → QUERY_FEES")
                     return "QUERY_FEES"
 
-        # Priority 3: Check for CAREER_ADVICE indicators
+        # Priority 3: Career advice indicators
         for indicator in CAREER_INDICATORS:
             if indicator in message_lower:
-                logger.debug(f"Career indicator found: '{indicator}' → CAREER_ADVICE")
                 return "CAREER_ADVICE"
 
-        # Priority 4: Check for general query indicators
+        # Priority 4: General query indicators
         for indicator in QUERY_INDICATORS:
             if indicator in message_lower:
-                logger.debug(f"Query indicator found: '{indicator}' → QUERY_DOCS")
                 return "QUERY_DOCS"
 
         # Priority 5: Long messages are typically queries
         if word_count > CHITCHAT_MAX_WORDS:
             return "QUERY_DOCS"
 
-        # Priority 6: Only classify as CHITCHAT if message is short AND has chitchat keyword
+        # Priority 6: Chitchat for short messages with chitchat keywords
         for keyword in CHITCHAT_KEYWORDS:
             pattern = rf'\b{re.escape(keyword)}\b'
             if re.search(pattern, message_lower):
-                logger.debug(f"Chitchat keyword found: '{keyword}' (words={word_count}) → CHITCHAT")
                 return "CHITCHAT"
 
-        # Default: treat as knowledge query
-        return "QUERY_DOCS"
+        # No confident match — return None to trigger next step
+        return None
+
+    # ------------------------------------------------------------------
+    # Step 2: Regex + fuzzy matching
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _classify_by_regex_fuzzy(message: str) -> Optional[str]:
+        """
+        Regex (word-boundary) + fuzzy matching (difflib) for typos
+        and no-diacritics input. Returns None if confidence is too low.
+        """
+        message_lower = message.lower()
+
+        # 2a. Regex match (handles exact, no-diacritics, extra spaces)
+        for intent, pattern in _INTENT_PATTERNS.items():
+            if pattern.search(message):
+                # Mirror keyword step: "dự kiến" → force QUERY_DOCS for fee queries
+                if intent == "QUERY_FEES" and "dự kiến" in message_lower:
+                    return "QUERY_DOCS"
+                return intent
+
+        # 2b. Fuzzy matching for light typos
+        best_intent = None
+        best_score = 0.0
+
+        for intent, keywords in _FUZZY_KEYWORDS.items():
+            for kw in keywords:
+                score = SequenceMatcher(None, message_lower, kw.lower()).ratio()
+                if score > best_score:
+                    best_score = score
+                    best_intent = intent
+
+            # Also try matching each word-window of the query against each keyword
+            words = message_lower.split()
+            for kw in keywords:
+                kw_lower = kw.lower()
+                kw_word_count = len(kw_lower.split())
+                for i in range(len(words) - kw_word_count + 1):
+                    window = " ".join(words[i: i + kw_word_count])
+                    score = SequenceMatcher(None, window, kw_lower).ratio()
+                    if score > best_score:
+                        best_score = score
+                        best_intent = intent
+
+        if best_score >= _FUZZY_THRESHOLD and best_intent is not None:
+            return best_intent
+
+        return None
+
+    # ------------------------------------------------------------------
+    # Step 3: LLM fallback
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _classify_by_llm(message: str) -> str:
+        """
+        Use LLM to classify intent when keyword/regex/fuzzy all failed.
+        Falls back to QUERY_DOCS if LLM is unavailable or returns garbage.
+        """
+        try:
+            if Settings.llm is None:
+                logger.warning("LLM not available for intent classification, defaulting to QUERY_DOCS")
+                return "QUERY_DOCS"
+
+            messages = [
+                ChatMessage(role=MessageRole.SYSTEM, content=INTENT_CLASSIFY_PROMPT),
+                ChatMessage(role=MessageRole.USER, content=message),
+            ]
+
+            response = await Settings.llm.achat(messages)
+            raw = response.message.content.strip().upper()
+
+            # Parse — the LLM should return exactly one of the valid intents
+            if raw in _VALID_INTENTS:
+                return raw
+
+            # Try to extract a valid intent from a longer response
+            for valid in _VALID_INTENTS:
+                if valid in raw:
+                    return valid
+
+            logger.warning(f"LLM returned unexpected intent: '{raw}', defaulting to QUERY_DOCS")
+            return "QUERY_DOCS"
+
+        except Exception as e:
+            logger.warning(f"LLM intent classification failed: {e}, defaulting to QUERY_DOCS")
+            return "QUERY_DOCS"
+
+    # ------------------------------------------------------------------
+    # Utility: get fine-grained intent for prompt selection
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def get_fine_intent(routing_intent: str) -> str:
+        """Convert routing intent (QUERY_SCORES) to fine-grained (diem_chuan) for prompt selection."""
+        return ROUTING_TO_FINE.get(routing_intent, "general")
+
+    # ------------------------------------------------------------------
+    # Future year check (unchanged)
+    # ------------------------------------------------------------------
 
     @staticmethod
     def check_future_year(

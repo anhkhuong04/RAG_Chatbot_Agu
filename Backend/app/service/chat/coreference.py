@@ -1,11 +1,3 @@
-"""
-Coreference Resolution module.
-
-Resolves pronouns and demonstratives (này, đó, ấy, etc.) in user messages
-by rewriting them into self-contained queries using chat history context.
-
-Extracted from ChatService._resolve_coreferences.
-"""
 import logging
 from typing import List
 
@@ -30,11 +22,12 @@ RESOLVE_SYSTEM_PROMPT = (
     "1. Thay thế đại từ chỉ thị (này, đó, ấy, kia) bằng thực thể cụ thể từ lịch sử hội thoại\n"
     "2. Giữ nguyên ý nghĩa và intent của câu hỏi gốc\n"
     "3. Nếu câu hỏi đã đủ rõ ràng, trả về nguyên văn\n"
+    "3.1 KHÔNG tự thêm ngành mới nếu lịch sử hội thoại không nêu\n"
     "4. CHỈ trả về câu hỏi đã viết lại, KHÔNG giải thích\n\n"
     "Ví dụ:\n"
-    "Lịch sử: User hỏi về ngành CNTT và KTPM\n"
+    "Lịch sử: User hỏi về ngành Kế toán và Quản trị kinh doanh\n"
     "Câu hỏi: 'điểm chuẩn 2 ngành này năm trước'\n"
-    "→ 'điểm chuẩn ngành Công nghệ thông tin và Kỹ thuật phần mềm năm trước'"
+    "→ 'điểm chuẩn ngành Kế toán và Quản trị kinh doanh năm trước'"
 )
 
 
@@ -42,21 +35,6 @@ class CoreferenceResolver:
     """Resolves coreferences in user messages using LLM + chat history."""
 
     async def resolve(self, message: str, history: List[ChatMessage]) -> str:
-        """
-        Resolve coreferences (anaphora) in user message using chat history.
-
-        When users refer to previous context with pronouns or demonstratives
-        like "2 ngành này", "ngành đó", "trường này", this method rewrites
-        the message into a self-contained query.
-
-        Args:
-            message: Current user message (may contain unresolved references)
-            history: Recent chat history for context
-
-        Returns:
-            Self-contained message with references resolved, or original if
-            no resolution needed.
-        """
         if not history:
             return message
 

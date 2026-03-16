@@ -33,9 +33,9 @@ class HybridRetriever(BaseRetriever):
         vector_index: VectorStoreIndex,
         nodes: List[Any],
         alpha: float = 0.5,
-        dense_top_k: int = 10,
-        sparse_top_k: int = 10,
-        final_top_k: int = 10,
+        dense_top_k: int = 20,
+        sparse_top_k: int = 20,
+        final_top_k: int = 20,
     ):
         """
         Initialize Hybrid Retriever.

@@ -81,7 +81,7 @@ async def _sse_generator(chat_service: ChatService, session_id: str, message: st
     """
     try:
         # Detect intent before streaming
-        intent = chat_service._intent_classifier.classify(message)
+        intent = await chat_service._intent_classifier.classify(message)
         sources: List[str] = []
 
         # Send metadata (session_id, intent) as the first event

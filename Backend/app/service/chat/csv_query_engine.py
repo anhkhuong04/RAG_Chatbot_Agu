@@ -322,7 +322,8 @@ class CSVQueryEngine:
             f"KHÔNG được bọc code trong markdown code blocks (``` hoặc ```python).\n"
             f"KHÔNG thêm giải thích hay comment. CHỈ code thuần.\n"
             f"Biến DataFrame tên là 'df'.\n"
-            f"KHÔNG dùng print(). Dòng cuối cùng PHẢI là một expression chuyển kết quả sang định dạng có thể đọc toàn bộ, ví dụ: result.to_markdown(index=False) hoặc result.to_string(max_rows=None). TUYỆT ĐỐI KHÔNG sử dụng hàm .head() để giới hạn dữ liệu.\n"
+            f"KHÔNG dùng print(). Output PHẢI là MỘT BIỂU THỨC Pandas duy nhất có thể eval trực tiếp (ví dụ: df[df['NganhHoc'].str.contains('Công nghệ thông tin', case=False, na=False)]).\n"
+            f"TUYỆT ĐỐI KHÔNG dùng phép gán biến (KHÔNG viết 'result = ...'), KHÔNG gọi to_markdown()/to_string(), và KHÔNG dùng .head() để giới hạn dữ liệu.\n"
             f"Khi dùng str.contains(), LUÔN thêm na=False để tránh lỗi NaN.\n"
             f"Khi tìm ngành theo tên, LUÔN dùng str.contains(case=False, na=False) thay vì == để tránh miss do viết hoa/thường.\n"
             f"Khi cần tìm theo mã ngành (số), ép kiểu str trước khi so sánh: df[df['MaNganh'].astype(str).str.contains('7480201')].\n"
@@ -334,8 +335,7 @@ class CSVQueryEngine:
             f"Chỉ được filter hàng (rows), KHÔNG filter cột (columns).\n"
             f"Khi cần tìm nhiều ngành cùng lúc, dùng toán tử | (OR): "
             f"df[df['NganhHoc'].str.contains('Ngành A|Ngành B', case=False, na=False)].\n"
-            f"VÍ DỤ ĐÚNG: result = df[df['NganhHoc'].str.contains('Công nghệ thông tin', case=False, na=False)]\n"
-            f"result.to_markdown(index=False)\n"
+            f"VÍ DỤ ĐÚNG: df[df['NganhHoc'].str.contains('Công nghệ thông tin', case=False, na=False)]\n"
             f"VÍ DỤ SAI (KHÔNG ĐƯỢC LÀM): df[df['NganhHoc'].str.contains('CNTT')][['MaNganh','PT2']]\n"
         )
 
@@ -380,7 +380,8 @@ class CSVQueryEngine:
         retry_message = (
             f"{message}\n\n"
             f"LƯU Ý ĐẶC BIỆT: Trả về TẤT CẢ các cột, KHÔNG chọn subset cột. "
-            f"Code PHẢI ở dạng: result = df[<điều_kiện_filter>]\nresult.to_markdown(index=False)"
+            f"Code PHẢI là MỘT BIỂU THỨC Pandas duy nhất dạng: df[<điều_kiện_filter>]\n"
+            f"TUYỆT ĐỐI KHÔNG dùng gán biến (KHÔNG 'result = ...') và KHÔNG gọi to_markdown/to_string."
         )
         try:
             pandas_response = await asyncio.to_thread(engine.query, retry_message)

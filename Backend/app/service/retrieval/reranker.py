@@ -37,7 +37,7 @@ class CrossEncoderReranker:
     def __init__(
         self,
         model_name: Optional[str] = None,
-        top_n: int = 5,
+        top_n: int = 3,
         device: Optional[str] = None,
     ):
         """
@@ -191,7 +191,7 @@ _reranker_instance: Optional[CrossEncoderReranker] = None
 
 def get_reranker(
     model_name: Optional[str] = None,
-    top_n: int = 5,
+    top_n: int = 3,
 ) -> CrossEncoderReranker:
     """
     Get singleton reranker instance.
