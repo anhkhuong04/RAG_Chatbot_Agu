@@ -1,8 +1,3 @@
-"""
-Unit tests for Admin JWT Authentication:
-- core/security.py: token creation, decoding, password hashing
-- admin.py: POST /login, protected routes return 401 without token
-"""
 import os
 from datetime import timedelta
 from unittest.mock import patch, MagicMock
@@ -76,11 +71,6 @@ class TestSecurity:
         tampered = parts[0] + ".TAMPERED"
         with pytest.raises(JWTError):
             self.decode_access_token(tampered)
-
-
-# ---------------------------------------------------------------------------
-# Integration tests — FastAPI TestClient against admin endpoints
-# ---------------------------------------------------------------------------
 
 def _build_test_app():
     app = FastAPI()

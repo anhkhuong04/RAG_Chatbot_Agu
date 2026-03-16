@@ -1,4 +1,3 @@
-"""Comprehensive test for điểm chuẩn + học phí after bugfixes."""
 import requests
 
 BASE_URL = "http://localhost:8000/api/v1/chat"

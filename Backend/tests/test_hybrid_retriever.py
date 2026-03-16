@@ -1,10 +1,3 @@
-"""
-Unit tests for HybridRetriever.update_bm25_index:
-- Runs rebuild in background (run_in_executor)
-- asyncio.Lock prevents concurrent rebuilds
-- Atomic swap of bm25_retriever
-- Empty nodes warning
-"""
 import asyncio
 from unittest.mock import MagicMock, patch, AsyncMock
 

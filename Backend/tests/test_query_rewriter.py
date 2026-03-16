@@ -1,10 +1,3 @@
-"""
-Unit tests for QueryRewriter:
-- asyncio.gather() parallel execution in rewrite()
-- Fault tolerance (one task failing doesn't crash the pipeline)
-
-Note: _detect_intent tests are now in test_intent_classifier.py
-"""
 import asyncio
 from dataclasses import dataclass
 from unittest.mock import AsyncMock, MagicMock, patch

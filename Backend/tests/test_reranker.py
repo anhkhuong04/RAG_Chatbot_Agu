@@ -1,11 +1,3 @@
-"""
-Unit tests for CrossEncoderReranker:
-- async rerank() runs model.predict via run_in_executor
-- async rerank_with_scores() same treatment
-- Return types (List[NodeWithScore], List[tuple]) unchanged
-- Empty input edge case
-- Graceful fallback on predict failure
-"""
 import asyncio
 from unittest.mock import MagicMock, patch, PropertyMock
 import numpy as np
