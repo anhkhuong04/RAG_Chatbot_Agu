@@ -37,17 +37,6 @@ class HybridRetriever(BaseRetriever):
         sparse_top_k: int = 20,
         final_top_k: int = 20,
     ):
-        """
-        Initialize Hybrid Retriever.
-        
-        Args:
-            vector_index: LlamaIndex VectorStoreIndex for dense retrieval
-            nodes: List of nodes for BM25 index (from documents)
-            alpha: Balance between dense (1.0) and sparse (0.0). Default 0.5
-            dense_top_k: Number of results from dense retriever
-            sparse_top_k: Number of results from sparse retriever
-            final_top_k: Number of final fused results
-        """
         super().__init__()
         
         self.alpha = alpha
@@ -77,15 +66,6 @@ class HybridRetriever(BaseRetriever):
         )
     
     def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
-        """
-        Retrieve nodes using hybrid search.
-        
-        Args:
-            query_bundle: Query bundle containing the query string
-            
-        Returns:
-            List of NodeWithScore objects sorted by RRF score
-        """
         query = query_bundle.query_str
         
         # 1. Dense Retrieval (Semantic Search)
@@ -119,20 +99,6 @@ class HybridRetriever(BaseRetriever):
         sparse_nodes: List[NodeWithScore],
         k: int = 60,
     ) -> List[NodeWithScore]:
-        """
-        Combine results using Reciprocal Rank Fusion (RRF).
-        
-        RRF Score = Σ 1/(k + rank)
-        
-        Args:
-            dense_nodes: Results from dense retriever
-            sparse_nodes: Results from sparse retriever
-            k: Constant to prevent high ranks from dominating (default 60)
-            
-        Returns:
-            Fused and sorted list of NodeWithScore
-        """
-        # Store scores and node references
         node_scores: Dict[str, float] = defaultdict(float)
         node_map: Dict[str, NodeWithScore] = {}
         
@@ -172,21 +138,6 @@ class HybridRetriever(BaseRetriever):
     _bm25_rebuild_lock = asyncio.Lock()
 
     async def update_bm25_index(self, nodes: List[Any]) -> None:
-        """
-        Update the BM25 index with new nodes.
-        Call this after ingesting new documents.
-
-        The rebuild runs in a thread-pool executor so it does not block the
-        FastAPI event loop.  An asyncio.Lock prevents concurrent rebuilds.
-
-        Note: The current version of llama-index BM25Retriever does NOT expose
-        an ``insert_nodes()`` method, so the index must be rebuilt from scratch.
-        Once upstream support is added, this can be changed to an incremental
-        append.
-
-        Args:
-            nodes: Complete list of nodes to index
-        """
         if not nodes:
             logger.warning("⚠️ No nodes provided for BM25 update")
             return

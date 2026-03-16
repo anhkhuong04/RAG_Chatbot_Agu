@@ -17,10 +17,6 @@ _qdrant_lock = threading.Lock()
 
 
 def get_qdrant_client() -> QdrantClient:
-    """
-    Get or create the singleton QdrantClient.
-    Thread-safe via double-checked locking.
-    """
     global _qdrant_client
     if _qdrant_client is not None:
         return _qdrant_client

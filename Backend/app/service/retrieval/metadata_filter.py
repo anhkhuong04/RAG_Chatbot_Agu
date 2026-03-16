@@ -65,25 +65,10 @@ class MetadataFilterService:
     MAX_YEAR = 2035
     
     def __init__(self, default_year: Optional[int] = None):
-        """
-        Initialize MetadataFilterService.
-        
-        Args:
-            default_year: Default year if not specified in query (None = current year)
-        """
         self.default_year = default_year or datetime.now().year
         logger.info(f"✅ MetadataFilterService initialized (default_year={self.default_year})")
     
     def extract_filters(self, query: str) -> Dict[str, Any]:
-        """
-        Extract metadata filters from query string.
-        
-        Args:
-            query: User's query string
-            
-        Returns:
-            Dict with extracted filters (year, category, etc.)
-        """
         filters = {}
         query_lower = query.lower()
         
@@ -103,7 +88,6 @@ class MetadataFilterService:
         return filters
     
     def _extract_year(self, query: str) -> Optional[int]:
-        """Extract year from query using regex patterns."""
         for pattern in self.YEAR_PATTERNS:
             match = re.search(pattern, query, re.IGNORECASE)
             if match:
@@ -113,7 +97,6 @@ class MetadataFilterService:
         return None
     
     def _extract_category(self, query_lower: str) -> Optional[str]:
-        """Extract category based on keywords."""
         for category, keywords in self.CATEGORY_KEYWORDS.items():
             for keyword in keywords:
                 if keyword in query_lower:
@@ -121,15 +104,6 @@ class MetadataFilterService:
         return None
     
     def build_qdrant_filters(self, filters: Dict[str, Any]) -> Optional[MetadataFilters]:
-        """
-        Build LlamaIndex MetadataFilters for Qdrant pre-filtering.
-        
-        Args:
-            filters: Dict of filter conditions
-            
-        Returns:
-            MetadataFilters object or None if no filters
-        """
         if not filters:
             return None
         
@@ -167,20 +141,6 @@ class MetadataFilterService:
         filters: Dict[str, Any],
         strict: bool = False,
     ) -> List[NodeWithScore]:
-        """
-        Apply post-retrieval filtering on nodes.
-        
-        Use this when pre-filtering in vector store is not available
-        or as an additional filter after retrieval.
-        
-        Args:
-            nodes: List of retrieved nodes
-            filters: Filter conditions
-            strict: If True, return empty if no matches. If False, return all on no matches.
-            
-        Returns:
-            Filtered list of nodes
-        """
         if not filters or not nodes:
             return nodes
         
@@ -235,15 +195,6 @@ class MetadataFilterService:
         return filtered
     
     def get_filter_summary(self, filters: Dict[str, Any]) -> str:
-        """
-        Get human-readable filter summary for logging/debugging.
-        
-        Args:
-            filters: Filter dict
-            
-        Returns:
-            Summary string
-        """
         if not filters:
             return "No filters applied"
         
@@ -263,15 +214,6 @@ _filter_service: Optional[MetadataFilterService] = None
 def get_metadata_filter_service(
     default_year: Optional[int] = None,
 ) -> MetadataFilterService:
-    """
-    Get singleton MetadataFilterService instance.
-    
-    Args:
-        default_year: Default year (only used on first call)
-        
-    Returns:
-        MetadataFilterService instance
-    """
     global _filter_service
     
     if _filter_service is None:

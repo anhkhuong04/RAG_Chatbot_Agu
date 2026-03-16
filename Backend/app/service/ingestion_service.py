@@ -152,31 +152,14 @@ class IngestionService:
 
     @staticmethod
     def is_supported_file(filename: str) -> bool:
-        """Check if file extension is supported"""
         ext = os.path.splitext(filename.lower())[1]
         return ext in IngestionService.SUPPORTED_EXTENSIONS
     
     @staticmethod
     def get_file_extension(filename: str) -> str:
-        """Get lowercase file extension"""
         return os.path.splitext(filename.lower())[1]
 
     def process_file(self, file_path: str, metadata: dict) -> str | None:
-        """
-        Process a file (PDF, TXT, DOCX, or Image):
-        1. Validate file extension
-        2. Save metadata to MongoDB (PENDING)
-        3. Parse file based on type
-        4. Chunk & Embed -> Qdrant
-        5. Update MongoDB (INDEXED)
-        
-        Args:
-            file_path: Path to the file
-            metadata: Dict with year, category, description, etc.
-            
-        Returns:
-            doc_uuid if successful, None if failed
-        """
         filename = os.path.basename(file_path)
         ext = self.get_file_extension(filename)
         
@@ -302,17 +285,6 @@ class IngestionService:
         return self.DEFAULT_PARSING_INSTRUCTION, False
     
     def _load_with_llama_parse(self, file_path: str, category: str = None) -> tuple[list, str]:
-        """
-        Load PDF using LlamaParse with category-specific instructions.
-        Falls back to SimpleDirectoryReader if LlamaParse fails.
-        
-        Args:
-            file_path: Path to the PDF file
-            category: Document category for custom parsing instructions
-            
-        Returns:
-            Tuple of (documents list, parsing_method used)
-        """
         try:
             # Get category-specific parsing instruction
             instruction, is_custom = self._get_parsing_instruction(category)
@@ -350,7 +322,6 @@ class IngestionService:
             return self._load_with_simple_reader(file_path)
     
     def _load_rtf(self, file_path: str) -> tuple[list, str]:
-        """Load RTF file by converting to plain text using striprtf."""
         logger.info(f"📄 Loading RTF file: {os.path.basename(file_path)}")
         with open(file_path, 'r', encoding='utf-8') as f:
             rtf_content = f.read()
@@ -359,16 +330,6 @@ class IngestionService:
         return [doc], self.PARSE_METHOD_SIMPLE
 
     def _load_with_simple_reader(self, file_path: str) -> tuple[list, str]:
-        """
-        Load document using SimpleDirectoryReader.
-        Supports TXT, DOCX, Images, and as fallback for PDFs.
-        
-        Args:
-            file_path: Path to the file
-            
-        Returns:
-            Tuple of (documents list, parsing_method used)
-        """
         logger.info(f"📄 Using SimpleDirectoryReader for: {os.path.basename(file_path)}")
         reader = SimpleDirectoryReader(
             input_files=[file_path],
@@ -378,17 +339,6 @@ class IngestionService:
         return documents, self.PARSE_METHOD_SIMPLE
     
     def _index_nodes(self, documents, metadata: dict, doc_uuid: str) -> int:
-        """
-        Process documents: chunk, attach metadata, embed, and index to Qdrant.
-        
-        Args:
-            documents: List of Document objects from loader
-            metadata: Document metadata (year, category, etc.)
-            doc_uuid: Unique document identifier
-            
-        Returns:
-            Number of chunks indexed
-        """
         filename = metadata.get("original_filename", "unknown")
         parsing_method = metadata.get("parsing_method", self.PARSE_METHOD_SIMPLE)
         
@@ -431,18 +381,6 @@ class IngestionService:
         return len(nodes)
     
     def _enrich_nodes_with_context(self, nodes, metadata):
-        """
-        Enrich each node with contextual information like chapter/article numbers.
-        This helps the LLM understand where each chunk belongs in the document structure.
-        
-        Args:
-            nodes: List of text nodes from splitter
-            metadata: Document metadata
-            
-        Returns:
-            Enriched nodes with section context
-        """
-        # Patterns for Vietnamese legal document structure
         chapter_pattern = re.compile(r'(Chương\s+[IVXLCDM\d]+[.:]\s*[^\n]+)', re.IGNORECASE)
         article_pattern = re.compile(r'(Điều\s+\d+[.:]\s*[^\n]+)', re.IGNORECASE)
         section_pattern = re.compile(r'(Mục\s+\d+[.:]\s*[^\n]+)', re.IGNORECASE)
@@ -490,24 +428,6 @@ class IngestionService:
         return nodes
     
     def _extract_table_to_csv(self, documents, category: str, year: int) -> tuple[str | None, int]:
-        """
-        Extract structured data from documents using LLM Structured Output (Pydantic).
-        Replaces brittle Markdown text parsing with semantic extraction.
-        
-        Flow:
-        1. Iterate over document nodes
-        2. Call LLM with Pydantic schema to extract structured JSON
-        3. Aggregate records & metadata notes
-        4. Flatten to DataFrame → save CSV + metadata text
-        
-        Args:
-            documents: List of Document objects (from LlamaParse or SimpleDirectoryReader)
-            category: "điểm chuẩn" or "học phí"
-            year: Academic year for file naming
-            
-        Returns:
-            Tuple of (csv_path or None, total_row_count)
-        """
         os.makedirs(self.STRUCTURED_DATA_DIR, exist_ok=True)
         category_lower = category.lower().strip()
         
@@ -519,16 +439,6 @@ class IngestionService:
         return None, 0
     
     def _extract_admission_scores(self, documents, year: int) -> tuple[str | None, int]:
-        """
-        Extract admission scores using LLM Structured Output with AdmissionTableExtraction schema.
-        
-        Args:
-            documents: List of Document objects
-            year: Academic year
-            
-        Returns:
-            Tuple of (csv_path, row_count)
-        """
         all_records: List[AdmissionRecord] = []
         all_notes: set = set()
         
@@ -692,14 +602,11 @@ class IngestionService:
         return None, 0
     
     def get_all_documents(self):
-        """Get all documents from MongoDB"""
         return list(self.doc_collection.find({}, {"_id": 0}))
     
     def get_document_by_id(self, doc_uuid: str):
-        """Get a specific document by UUID"""
         return self.doc_collection.find_one({"doc_uuid": doc_uuid}, {"_id": 0})
     
     def delete_document(self, doc_uuid: str) -> bool:
-        """Delete a document from MongoDB (note: vectors in Qdrant remain)"""
         result = self.doc_collection.delete_one({"doc_uuid": doc_uuid})
         return result.deleted_count > 0

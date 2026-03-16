@@ -40,15 +40,6 @@ class CrossEncoderReranker:
         top_n: int = 3,
         device: Optional[str] = None,
     ):
-        """
-        Initialize Cross-Encoder Reranker.
-        
-        Args:
-            model_name: Model name or preset ("fast", "balanced", "accurate", "best")
-            top_n: Number of top results to return after reranking
-            device: Device to run model on ("cpu", "cuda", or None for auto)
-        """
-        # Resolve model name
         if model_name is None:
             model_name = os.getenv("RERANK_MODEL", "fast")
         
@@ -77,18 +68,6 @@ class CrossEncoderReranker:
         nodes: List[NodeWithScore],
         top_n: Optional[int] = None,
     ) -> List[NodeWithScore]:
-        """
-        Rerank nodes using cross-encoder scoring.
-        Runs model inference in a thread executor to avoid blocking the event loop.
-        
-        Args:
-            query: The search query
-            nodes: List of NodeWithScore from retrieval
-            top_n: Override default top_n for this call
-            
-        Returns:
-            Reranked list of NodeWithScore (top_n results)
-        """
         if not nodes:
             return []
         
@@ -147,19 +126,6 @@ class CrossEncoderReranker:
         query: str,
         nodes: List[NodeWithScore],
     ) -> List[tuple]:
-        """
-        Rerank and return nodes with both original and reranker scores.
-        Runs model inference in a thread executor to avoid blocking the event loop.
-        
-        Useful for debugging and analysis.
-        
-        Args:
-            query: The search query
-            nodes: List of NodeWithScore from retrieval
-            
-        Returns:
-            List of (node, original_score, reranker_score) tuples
-        """
         if not nodes:
             return []
         
@@ -193,16 +159,6 @@ def get_reranker(
     model_name: Optional[str] = None,
     top_n: int = 3,
 ) -> CrossEncoderReranker:
-    """
-    Get singleton reranker instance.
-    
-    Args:
-        model_name: Model name (only used on first call)
-        top_n: Default top_n (only used on first call)
-        
-    Returns:
-        CrossEncoderReranker instance
-    """
     global _reranker_instance
     
     if _reranker_instance is None:

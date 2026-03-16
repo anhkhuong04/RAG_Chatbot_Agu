@@ -20,7 +20,6 @@ from app.service.retrieval.query_rewriter import QueryRewriter, RewrittenQuery
 # ---------------------------------------------------------------------------
 
 def _make_chat_response(content: str):
-    """Create a mock LLM chat response."""
     msg = MagicMock()
     msg.content = content
     resp = MagicMock()
@@ -42,7 +41,6 @@ class TestRewriteParallel:
 
     @pytest.mark.asyncio
     async def test_all_tasks_run_in_parallel(self):
-        """All 3 LLM tasks should complete and results should be populated."""
         rewrite_resp = _make_chat_response("Điểm chuẩn ngành Công nghệ thông tin")
         expand_resp = _make_chat_response(
             "Điểm trúng tuyển CNTT\nĐiểm đỗ ngành Công nghệ thông tin"
@@ -76,7 +74,6 @@ class TestRewriteParallel:
 
     @pytest.mark.asyncio
     async def test_keyword_failure_does_not_crash(self):
-        """If keyword extraction fails, rewrite & expand should still succeed."""
         rewrite_resp = _make_chat_response("Học phí đại học")
         expand_resp = _make_chat_response("Chi phí học tập")
 
@@ -102,7 +99,6 @@ class TestRewriteParallel:
 
     @pytest.mark.asyncio
     async def test_rewrite_failure_keeps_original(self):
-        """If rewrite task fails, original query is kept."""
         expand_resp = _make_chat_response("Câu hỏi mở rộng")
         keyword_resp = _make_chat_response("keyword1")
 
@@ -127,7 +123,6 @@ class TestRewriteParallel:
 
     @pytest.mark.asyncio
     async def test_rewrite_guard_blocks_cntt_injection_for_general_policy_query(self):
-        """Generic policy query should not be rewritten into CNTT-specific query."""
         rewrite_resp = _make_chat_response("Học bổng ngành Công nghệ thông tin như thế nào")
 
         async def mock_achat(messages):
@@ -149,7 +144,6 @@ class TestRewriteParallel:
 
     @pytest.mark.asyncio
     async def test_disabled_tasks_not_called(self):
-        """Disabled tasks should not generate LLM calls."""
         qr = QueryRewriter(
             enable_rewrite=False, enable_expansion=False, enable_keywords=False
         )
@@ -168,7 +162,6 @@ class TestRewriteParallel:
 
     @pytest.mark.asyncio
     async def test_detected_intent_defaults_to_general(self):
-        """Intent detection is no longer done in QueryRewriter; field should default to 'general'."""
         qr = QueryRewriter(
             enable_rewrite=False, enable_expansion=False, enable_keywords=False
         )

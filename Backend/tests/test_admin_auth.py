@@ -83,7 +83,6 @@ class TestSecurity:
 # ---------------------------------------------------------------------------
 
 def _build_test_app():
-    """Build a minimal FastAPI app with just the admin router."""
     app = FastAPI()
     from app.api.v1.endpoints.admin import router
     app.include_router(router, prefix="/api/v1")
@@ -141,22 +140,17 @@ class TestProtectedRoutes:
 
     @pytest.mark.parametrize("method, path", PROTECTED_ROUTES)
     def test_no_token_returns_401(self, method, path):
-        """Requests without Authorization header should be rejected."""
         resp = self.client.request(method, path)
         assert resp.status_code in (401, 403)
 
     @pytest.mark.parametrize("method, path", PROTECTED_ROUTES)
     def test_invalid_token_returns_401(self, method, path):
-        """Requests with an invalid token should return 401."""
         resp = self.client.request(
             method, path, headers={"Authorization": "Bearer invalid.token.here"}
         )
         assert resp.status_code == 401
 
     def test_valid_token_passes_auth(self):
-        """A valid token should pass the auth barrier (the endpoint itself may
-        still fail due to missing DB, but it should NOT be 401/403)."""
-        # Login first
         login_resp = self.client.post(
             "/api/v1/admin/login",
             json={"username": "admin", "password": "admin123"},
@@ -170,6 +164,5 @@ class TestProtectedRoutes:
         assert resp.status_code not in (401, 403)
 
     def test_upload_without_token_rejected(self):
-        """POST /upload should be protected."""
         resp = self.client.post("/api/v1/admin/upload")
         assert resp.status_code in (401, 403)

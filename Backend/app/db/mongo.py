@@ -20,10 +20,6 @@ _mongo_lock = threading.Lock()
 
 
 def get_mongo_client() -> MongoClient:
-    """
-    Get or create the singleton MongoClient.
-    Thread-safe via double-checked locking.
-    """
     global _mongo_client
     if _mongo_client is not None:
         return _mongo_client
@@ -40,10 +36,8 @@ def get_mongo_client() -> MongoClient:
 
 
 def get_database(db_name: str = "university_db") -> Database:
-    """Get a MongoDB database instance."""
     return get_mongo_client()[db_name]
 
 
 def get_chat_sessions_collection() -> Collection:
-    """Get the chat_sessions collection (convenience shortcut)."""
     return get_database()["chat_sessions"]

@@ -57,10 +57,6 @@ class PromptService:
     # ============================================
 
     def _seed_defaults_if_empty(self):
-        """
-        Seed MongoDB with hardcoded INTENT_PROMPTS if the collection is empty.
-        This ensures a smooth migration — existing prompts are preserved.
-        """
         if self.collection.count_documents({}) > 0:
             logger.info(
                 f"📋 Prompts collection already has {self.collection.count_documents({})} documents — skipping seed."
@@ -99,7 +95,6 @@ class PromptService:
     # ============================================
 
     def _load_cache(self):
-        """Load all active prompts from MongoDB into memory (thread-safe)."""
         with self._cache_lock:
             if self._cache is not None:
                 return  # Already loaded
@@ -129,7 +124,6 @@ class PromptService:
                 self._full_cache = {}
 
     def invalidate_cache(self):
-        """Invalidate the in-memory cache. Next access will reload from MongoDB."""
         with self._cache_lock:
             self._cache = None
             self._full_cache = None
@@ -140,21 +134,10 @@ class PromptService:
     # ============================================
 
     def get_intent_prompt(self, intent: str) -> str:
-        """
-        Get the user_template for a specific intent.
-        Drop-in replacement for INTENT_PROMPTS.get(intent).
-        
-        Args:
-            intent: Intent name (e.g., "general", "diem_chuan")
-            
-        Returns:
-            The prompt template string
-        """
         self._load_cache()
         return self._cache.get(intent, self._cache.get("general", ""))
 
     def get_all_prompts(self) -> Dict[str, str]:
-        """Get all cached prompts as a dict (intent_name → user_template)."""
         self._load_cache()
         return dict(self._cache)
 
@@ -163,7 +146,6 @@ class PromptService:
     # ============================================
 
     def list_prompts(self) -> List[dict]:
-        """List all prompts from MongoDB (including inactive)."""
         cursor = self.collection.find({}).sort("intent_name", 1)
         results = []
         for doc in cursor:
@@ -172,20 +154,12 @@ class PromptService:
         return results
 
     def get_prompt(self, intent_name: str) -> Optional[dict]:
-        """Get a single prompt by intent_name."""
         doc = self.collection.find_one({"intent_name": intent_name})
         if doc:
             doc.pop("_id", None)
         return doc
 
     def update_prompt(self, intent_name: str, update: PromptUpdate) -> Optional[dict]:
-        """
-        Update a prompt's fields. Only non-None fields are updated.
-        Automatically invalidates cache after successful update.
-        
-        Returns:
-            Updated document dict, or None if not found.
-        """
         update_dict = {
             k: v for k, v in update.model_dump().items() if v is not None
         }
@@ -209,7 +183,6 @@ class PromptService:
         return result
 
     def create_prompt(self, record: PromptRecord) -> dict:
-        """Create a new prompt. Used for adding new intent types via Admin."""
         doc = record.model_dump()
         doc["created_at"] = datetime.utcnow()
         doc["updated_at"] = datetime.utcnow()
@@ -229,7 +202,6 @@ _prompt_service_lock = threading.Lock()
 
 
 def get_prompt_service() -> PromptService:
-    """Get or create the singleton PromptService instance."""
     global _prompt_service_instance
     if _prompt_service_instance is None:
         with _prompt_service_lock:

@@ -26,16 +26,6 @@ class ChatHistoryManager:
         self.chat_sessions = collection
 
     def load_history(self, session_id: str, limit: int = 5) -> List[ChatMessage]:
-        """
-        Load the last N messages from MongoDB and convert to LlamaIndex ChatMessage objects.
-
-        Args:
-            session_id: The chat session ID
-            limit: Maximum number of messages to retrieve (default: 5)
-
-        Returns:
-            List of ChatMessage objects for LlamaIndex
-        """
         try:
             session = self.chat_sessions.find_one({"session_id": session_id})
             if not session or "messages" not in session:
@@ -63,15 +53,6 @@ class ChatHistoryManager:
         content: str,
         sources: Optional[List[str]] = None,
     ):
-        """
-        Save a message to MongoDB chat history.
-
-        Args:
-            session_id: The chat session ID
-            role: "user" or "assistant"
-            content: Message content
-            sources: Optional list of source filenames (for assistant RAG responses)
-        """
         try:
             message_doc = {
                 "role": role,
@@ -98,15 +79,6 @@ class ChatHistoryManager:
             logger.warning(f"Could not save to history: {e}")
 
     def get_session_history(self, session_id: str) -> List[Dict]:
-        """
-        Get full conversation history for a session.
-
-        Args:
-            session_id: The chat session ID
-
-        Returns:
-            List of message dictionaries
-        """
         try:
             session = self.chat_sessions.find_one({"session_id": session_id})
             if session:
@@ -117,7 +89,6 @@ class ChatHistoryManager:
             return []
 
     def clear_session(self, session_id: str) -> bool:
-        """Delete a chat session."""
         try:
             result = self.chat_sessions.delete_one({"session_id": session_id})
             return result.deleted_count > 0
@@ -126,7 +97,6 @@ class ChatHistoryManager:
             return False
 
     def get_all_sessions(self, limit: int = 20) -> List[Dict]:
-        """Get recent sessions with their last message."""
         try:
             sessions = (
                 self.chat_sessions.find(

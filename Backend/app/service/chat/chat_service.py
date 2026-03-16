@@ -38,13 +38,6 @@ class ChatService:
     """Service for handling RAG-based chat interactions with intent routing."""
 
     def __init__(self):
-        """
-        Initialize ChatService:
-        - Initialize LlamaIndex Settings (LLM & Embeddings)
-        - Set up all sub-modules (intent, history, coreference, CSV, response)
-        - Connect to Qdrant and initialize Advanced RAG components
-        """
-        # Load configuration
         self.settings = get_settings()
 
         # Initialize LlamaIndex settings
@@ -96,7 +89,6 @@ class ChatService:
     # ------------------------------------------------------------------
 
     def _get_intent_prompt(self, intent: str) -> str:
-        """Get intent-specific prompt template from dynamic PromptService."""
         try:
             return self._prompt_service.get_intent_prompt(intent)
         except Exception as e:
@@ -109,7 +101,6 @@ class ChatService:
     # ------------------------------------------------------------------
 
     def _init_advanced_rag(self):
-        """Initialize Advanced RAG components."""
         rc = self.settings.retrieval
 
         if rc.enable_metadata_filter:
@@ -136,7 +127,6 @@ class ChatService:
                 self._reranker = None
 
     def _get_index(self) -> Optional[VectorStoreIndex]:
-        """Get or create the VectorStoreIndex from Qdrant (thread-safe)."""
         if self._index is not None:
             return self._index
 
@@ -158,7 +148,6 @@ class ChatService:
         return self._index
 
     def _init_hybrid_retriever(self):
-        """Initialize Hybrid Retriever after index is loaded."""
         if not self.settings.retrieval.enable_hybrid_search or self._index is None:
             return
 
@@ -179,7 +168,6 @@ class ChatService:
             self._hybrid_retriever = None
 
     def _load_nodes_from_qdrant(self) -> List[Any]:
-        """Load all text nodes from Qdrant for BM25 indexing."""
         try:
             all_nodes = []
             offset = None
@@ -235,7 +223,6 @@ class ChatService:
             return []
 
     def _get_query_engine(self):
-        """Get or create the query engine (FALLBACK)."""
         if self._query_engine is None:
             index = self._get_index()
             if index:
@@ -250,7 +237,6 @@ class ChatService:
     # ------------------------------------------------------------------
 
     async def process_message(self, session_id: str, message: str) -> Dict:
-        """Process a user message with 4-way intent routing."""
         print(f"Processing message: {message[:50]}...")
 
         try:
@@ -321,7 +307,6 @@ class ChatService:
     async def process_message_stream(
         self, session_id: str, message: str
     ) -> AsyncGenerator[str, None]:
-        """Process a user message with streaming response."""
         print(f"[STREAM] Processing message: {message[:50]}...")
 
         full_response = ""
@@ -415,7 +400,6 @@ class ChatService:
     # ------------------------------------------------------------------
 
     async def _retrieve_and_rerank(self, message: str) -> tuple[List[NodeWithScore], List[str]]:
-        """Execute the retrieval + reranking pipeline."""
         rc = self.settings.retrieval
         index = self._get_index()
         if index is None:
@@ -461,7 +445,6 @@ class ChatService:
         return final_nodes, sources
 
     async def _handle_rag_query(self, message: str, intent: str = "QUERY_DOCS") -> tuple[str, List[str]]:
-        """Handle knowledge-base queries using Advanced RAG."""
         if self._hybrid_retriever or self._reranker:
             try:
                 return await self._handle_advanced_rag_query(message, intent)
@@ -470,7 +453,6 @@ class ChatService:
         return await self._handle_basic_rag_query(message)
 
     async def _handle_advanced_rag_query(self, message: str, intent: str = "QUERY_DOCS") -> tuple[str, List[str]]:
-        """Handle queries using Advanced RAG pipeline."""
         index = self._get_index()
         if index is None:
             return (
@@ -530,7 +512,6 @@ class ChatService:
         return response_text, sources
 
     async def _handle_basic_rag_query(self, message: str) -> tuple[str, List[str]]:
-        """Handle queries using basic RAG (fallback method)."""
         try:
             query_engine = self._get_query_engine()
             if query_engine is None:
@@ -563,7 +544,6 @@ class ChatService:
         return self._history_manager.get_all_sessions(limit)
 
     def clear_cache(self) -> Dict[str, Any]:
-        """Clear all in-memory caches and reinitialize components."""
         try:
             old_nodes_count = len(self._all_nodes) if self._all_nodes else 0
             had_hybrid = self._hybrid_retriever is not None

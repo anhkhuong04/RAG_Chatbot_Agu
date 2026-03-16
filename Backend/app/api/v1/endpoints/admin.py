@@ -81,14 +81,12 @@ class TokenResponse(BaseModel):
 # ============================================
 
 def get_mongo_collection():
-    """Get MongoDB documents collection"""
     mongo_client = MongoClient(os.getenv("MONGO_URI"))
     db = mongo_client["university_db"]
     return db["documents"]
 
 
 def get_ingestion_service():
-    """Get IngestionService instance"""
     return IngestionService()
 
 
@@ -97,15 +95,6 @@ def get_ingestion_service():
 # ============================================
 
 def _cleanup_structured_files(doc: dict) -> list[str]:
-    """
-    Delete CSV and metadata .txt files created during structured data ingestion.
-    
-    Handles both:
-    - Điểm chuẩn: diem_chuan_{year}.csv + diem_chuan_{year}_metadata.txt
-    - Học phí: hoc_phi_bang_*_{year}.csv (multiple) + hoc_phi_{year}_metadata.txt
-    
-    Returns list of deleted file paths.
-    """
     deleted = []
     csv_path = doc.get("csv_path", "")
     
@@ -150,9 +139,6 @@ def _cleanup_structured_files(doc: dict) -> list[str]:
 
 @router.post("/login", response_model=TokenResponse)
 async def admin_login(body: LoginRequest):
-    """
-    Authenticate admin and return a JWT access token.
-    """
     if body.username != ADMIN_USERNAME or not verify_password(
         body.password, ADMIN_HASHED_PASSWORD
     ):
@@ -177,18 +163,6 @@ async def upload_document(
     description: Optional[str] = Form(None, description="Optional description"),
     _admin: str = Depends(get_current_admin),
 ):
-    """
-    Upload and process a document into the knowledge base.
-    
-    Supported formats: PDF, TXT, DOCX, JPG, JPEG, PNG
-    
-    Steps:
-    1. Validate file extension
-    2. Save to temp file
-    3. Process with IngestionService (chunking + embedding)
-    4. Return doc_uuid for tracking
-    """
-    # Validate file type using IngestionService
     if not IngestionService.is_supported_file(file.filename):
         raise HTTPException(
             status_code=400, 
@@ -242,11 +216,6 @@ async def upload_document(
 
 @router.get("/documents", response_model=List[DocumentRecord])
 async def list_documents(_admin: str = Depends(get_current_admin)):
-    """
-    List all documents in the knowledge base.
-    
-    Returns documents from MongoDB with their processing status.
-    """
     try:
         collection = get_mongo_collection()
         
@@ -280,14 +249,6 @@ async def list_documents(_admin: str = Depends(get_current_admin)):
 
 @router.delete("/documents/{doc_uuid}")
 async def delete_document(doc_uuid: str, _admin: str = Depends(get_current_admin)):
-    """
-    Delete a document from the knowledge base.
-    
-    This removes:
-    1. MongoDB record (document metadata)
-    2. Qdrant vectors (all chunks with matching doc_uuid)
-    3. CSV + metadata files for structured data categories (Điểm chuẩn, Học phí)
-    """
     try:
         collection = get_mongo_collection()
         
@@ -368,20 +329,6 @@ async def delete_document(doc_uuid: str, _admin: str = Depends(get_current_admin
 
 @router.post("/clear-cache")
 async def clear_cache(_admin: str = Depends(get_current_admin)):
-    """
-    Clear in-memory cache in ChatService.
-    
-    This clears:
-    - Vector index cache
-    - BM25 nodes cache
-    - Hybrid retriever cache
-    - Dynamic prompt cache
-    
-    Use this after:
-    - Deleting documents (auto-called)
-    - Uploading new documents
-    - Manual cache refresh
-    """
     try:
         chat_service = get_chat_service()
         result = chat_service.clear_cache()
@@ -422,10 +369,6 @@ async def clear_cache(_admin: str = Depends(get_current_admin)):
 
 @router.get("/prompts", response_model=List[PromptResponse])
 async def list_prompts(_admin: str = Depends(get_current_admin)):
-    """
-    List all intent prompts from MongoDB.
-    Returns both active and inactive prompts for admin management.
-    """
     try:
         service = get_prompt_service()
         prompts = service.list_prompts()
@@ -436,7 +379,6 @@ async def list_prompts(_admin: str = Depends(get_current_admin)):
 
 @router.get("/prompts/{intent_name}", response_model=PromptResponse)
 async def get_prompt(intent_name: str, _admin: str = Depends(get_current_admin)):
-    """Get a single prompt by intent name."""
     service = get_prompt_service()
     prompt = service.get_prompt(intent_name)
     if not prompt:
@@ -446,11 +388,6 @@ async def get_prompt(intent_name: str, _admin: str = Depends(get_current_admin))
 
 @router.put("/prompts/{intent_name}", response_model=PromptResponse)
 async def update_prompt(intent_name: str, update: PromptUpdate, _admin: str = Depends(get_current_admin)):
-    """
-    Update an intent prompt.
-    Only provided fields are updated (partial update).
-    Automatically invalidates the in-memory prompt cache.
-    """
     service = get_prompt_service()
 
     # Verify prompt exists
@@ -467,10 +404,6 @@ async def update_prompt(intent_name: str, update: PromptUpdate, _admin: str = De
 
 @router.post("/prompts", response_model=PromptResponse, status_code=201)
 async def create_prompt(record: PromptRecord, _admin: str = Depends(get_current_admin)):
-    """
-    Create a new intent prompt.
-    Used when adding support for new intent types.
-    """
     service = get_prompt_service()
 
     # Check for duplicates

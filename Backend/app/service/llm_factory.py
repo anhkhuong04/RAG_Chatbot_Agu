@@ -9,10 +9,6 @@ from app.core.config import get_settings
 load_dotenv()
 
 def init_settings():
-    """
-    Initialize LlamaIndex global settings with OpenAI LLM and Embeddings.
-    Call this once at application startup.
-    """
     app_settings = get_settings()
     llm_cfg = app_settings.llm
 
@@ -38,14 +34,12 @@ def init_settings():
 
 
 def get_llm():
-    """Get the configured LLM instance"""
     if Settings.llm is None:
         init_settings()
     return Settings.llm
 
 
 def get_embed_model():
-    """Get the configured embedding model"""
     if Settings.embed_model is None:
         init_settings()
     return Settings.embed_model

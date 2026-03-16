@@ -21,7 +21,6 @@ from llama_index.core.schema import NodeWithScore, TextNode
 # ---------------------------------------------------------------------------
 
 def _make_nodes(texts: list[str], scores: list[float] | None = None) -> list[NodeWithScore]:
-    """Create mock NodeWithScore objects."""
     if scores is None:
         scores = [1.0] * len(texts)
     return [
@@ -31,10 +30,6 @@ def _make_nodes(texts: list[str], scores: list[float] | None = None) -> list[Nod
 
 
 def _make_reranker(predict_scores):
-    """
-    Create a CrossEncoderReranker with a mocked model.predict.
-    Avoids loading a real model.
-    """
     from app.service.retrieval.reranker import CrossEncoderReranker
 
     with patch.object(CrossEncoderReranker, "__init__", lambda self, **kw: None):
@@ -58,7 +53,6 @@ class TestRerank:
 
     @pytest.mark.asyncio
     async def test_rerank_returns_sorted_nodes(self):
-        """Nodes should be sorted by cross-encoder score descending."""
         nodes = _make_nodes(["doc A", "doc B", "doc C"], [0.5, 0.5, 0.5])
         # Model scores: C > A > B
         reranker = _make_reranker([0.2, 0.1, 0.9])
@@ -75,7 +69,6 @@ class TestRerank:
 
     @pytest.mark.asyncio
     async def test_rerank_respects_top_n(self):
-        """Only top_n results should be returned."""
         nodes = _make_nodes(["a", "b", "c", "d", "e"])
         reranker = _make_reranker([0.5, 0.3, 0.9, 0.1, 0.7])
 
@@ -87,14 +80,12 @@ class TestRerank:
 
     @pytest.mark.asyncio
     async def test_rerank_empty_nodes(self):
-        """Empty input should return empty list."""
         reranker = _make_reranker([])
         result = await reranker.rerank("query", [])
         assert result == []
 
     @pytest.mark.asyncio
     async def test_rerank_predict_uses_executor(self):
-        """model.predict should be called via run_in_executor (not directly on event loop)."""
         nodes = _make_nodes(["doc"])
         reranker = _make_reranker([0.5])
 
@@ -115,7 +106,6 @@ class TestRerank:
 
     @pytest.mark.asyncio
     async def test_rerank_fallback_on_predict_error(self):
-        """If model.predict raises, return original nodes[:top_n]."""
         nodes = _make_nodes(["a", "b", "c"])
         reranker = _make_reranker([])
         reranker.model.predict = MagicMock(side_effect=RuntimeError("CUDA OOM"))
@@ -129,7 +119,6 @@ class TestRerank:
 
     @pytest.mark.asyncio
     async def test_rerank_truncates_long_text(self):
-        """Texts longer than 1500 chars should be truncated."""
         long_text = "x" * 2000
         nodes = _make_nodes([long_text])
         reranker = _make_reranker([0.5])
@@ -149,7 +138,6 @@ class TestRerankWithScores:
 
     @pytest.mark.asyncio
     async def test_returns_tuples_with_both_scores(self):
-        """Each result should be (node, original_score, reranker_score)."""
         nodes = _make_nodes(["a", "b"], scores=[0.8, 0.6])
         reranker = _make_reranker([0.3, 0.7])
 

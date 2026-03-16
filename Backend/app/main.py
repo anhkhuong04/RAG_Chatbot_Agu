@@ -36,7 +36,6 @@ app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
     return {
         "status": "running",
         "service": "University RAG Chatbot API",
@@ -46,7 +45,6 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
     return {
         "status": "healthy",
         "services": {

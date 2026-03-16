@@ -19,7 +19,6 @@ from llama_index.core.schema import NodeWithScore, TextNode
 # ---------------------------------------------------------------------------
 
 def _make_hybrid_retriever(nodes=None):
-    """Create a HybridRetriever with mocked dependencies."""
     from app.service.retrieval.hybrid_retriever import HybridRetriever
 
     with patch.object(HybridRetriever, "__init__", lambda self, **kw: None):
@@ -45,7 +44,6 @@ class TestUpdateBM25Index:
 
     @pytest.mark.asyncio
     async def test_rebuild_swaps_retriever(self):
-        """After update, bm25_retriever should be the new instance."""
         hr = _make_hybrid_retriever(nodes=["existing"])
         old_retriever = hr.bm25_retriever
 
@@ -63,7 +61,6 @@ class TestUpdateBM25Index:
 
     @pytest.mark.asyncio
     async def test_empty_nodes_skipped(self):
-        """Empty node list should not trigger rebuild."""
         hr = _make_hybrid_retriever(nodes=["existing"])
         old_retriever = hr.bm25_retriever
 
@@ -73,7 +70,6 @@ class TestUpdateBM25Index:
 
     @pytest.mark.asyncio
     async def test_none_nodes_skipped(self):
-        """None node list should not trigger rebuild."""
         hr = _make_hybrid_retriever(nodes=["existing"])
         old_retriever = hr.bm25_retriever
 
@@ -83,7 +79,6 @@ class TestUpdateBM25Index:
 
     @pytest.mark.asyncio
     async def test_uses_executor(self):
-        """BM25 rebuild should be dispatched to run_in_executor."""
         hr = _make_hybrid_retriever(nodes=["existing"])
 
         fake_retriever = MagicMock()
@@ -110,7 +105,6 @@ class TestUpdateBM25Index:
 
     @pytest.mark.asyncio
     async def test_lock_prevents_concurrent_rebuilds(self):
-        """Only one rebuild should run at a time."""
         hr = _make_hybrid_retriever(nodes=["existing"])
         rebuild_order = []
 
@@ -146,7 +140,6 @@ class TestUpdateBM25Index:
 
     @pytest.mark.asyncio
     async def test_passes_sparse_top_k(self):
-        """from_defaults should receive the correct sparse_top_k."""
         hr = _make_hybrid_retriever(nodes=["existing"])
         hr.sparse_top_k = 7
 

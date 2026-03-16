@@ -98,15 +98,6 @@ Quy tắc:
         enable_keywords: bool = True,
         max_expanded_queries: int = 3,
     ):
-        """
-        Initialize Query Rewriter.
-        
-        Args:
-            enable_rewrite: Enable query rewriting/clarification
-            enable_expansion: Enable multi-query expansion
-            enable_keywords: Enable keyword extraction
-            max_expanded_queries: Maximum number of expanded queries
-        """
         self.enable_rewrite = enable_rewrite
         self.enable_expansion = enable_expansion
         self.enable_keywords = enable_keywords
@@ -118,18 +109,6 @@ Quy tắc:
         )
     
     async def rewrite(self, query: str) -> RewrittenQuery:
-        """
-        Full query rewriting pipeline.
-        Runs rewrite, expansion, and keyword extraction in parallel via asyncio.gather().
-        
-        Note: Intent detection is no longer done here — use IntentClassifier instead.
-        
-        Args:
-            query: Original user query
-            
-        Returns:
-            RewrittenQuery with all enhancements (detected_intent defaults to "general")
-        """
         logger.info(f"📝 Rewriting query: {query[:50]}...")
         
         # Initialize result
@@ -202,15 +181,6 @@ Quy tắc:
         return result
     
     async def rewrite_simple(self, query: str) -> str:
-        """
-        Simple query rewriting - just returns the rewritten query.
-        
-        Args:
-            query: Original user query
-            
-        Returns:
-            Rewritten query string
-        """
         if not self.enable_rewrite:
             return query
         
@@ -221,9 +191,6 @@ Quy tắc:
             return query
     
     async def _rewrite_query(self, query: str) -> str:
-        """
-        Rewrite query using LLM for clarification and normalization.
-        """
         messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=self.REWRITE_SYSTEM_PROMPT),
             ChatMessage(
@@ -255,10 +222,6 @@ Quy tắc:
         return any(term in text for term in terms)
 
     def _is_over_specific_rewrite(self, original: str, rewritten: str) -> bool:
-        """
-        Detect rewrite that injects CNTT/specific-major terms while the original
-        asks a generic policy question at school scope.
-        """
         o = original.lower()
         r = rewritten.lower()
 
@@ -269,9 +232,6 @@ Quy tắc:
         return (not original_has_cntt) and rewritten_has_cntt and original_is_general_policy
     
     async def _expand_query(self, query: str) -> List[str]:
-        """
-        Generate alternative phrasings of the query.
-        """
         messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=self.EXPAND_SYSTEM_PROMPT),
             ChatMessage(
@@ -296,9 +256,6 @@ Quy tắc:
         return expanded[:self.max_expanded_queries]
     
     async def _extract_keywords(self, query: str) -> List[str]:
-        """
-        Extract important keywords from query for BM25 boost.
-        """
         messages = [
             ChatMessage(role=MessageRole.SYSTEM, content=self.KEYWORD_SYSTEM_PROMPT),
             ChatMessage(role=MessageRole.USER, content=query)
@@ -316,17 +273,6 @@ Quy tắc:
         return keywords
     
     async def get_all_queries(self, query: str) -> List[str]:
-        """
-        Get all query variants for multi-query retrieval.
-        
-        Returns original + rewritten + expanded queries (deduplicated).
-        
-        Args:
-            query: Original user query
-            
-        Returns:
-            List of unique query variants
-        """
         result = await self.rewrite(query)
         
         # Collect all unique queries
@@ -354,25 +300,10 @@ class HyDEQueryExpander:
     """
     
     def __init__(self, enabled: bool = False):
-        """
-        Initialize HyDE Expander.
-        
-        Args:
-            enabled: Whether HyDE expansion is enabled (disabled by default as it's experimental)
-        """
         self.enabled = enabled
         logger.info(f"HyDEQueryExpander initialized (enabled={enabled})")
     
     async def generate_hypothetical_document(self, query: str) -> str:
-        """
-        Generate a hypothetical document that would answer the query.
-        
-        Args:
-            query: User's question
-            
-        Returns:
-            Hypothetical document text
-        """
         if not self.enabled:
             return ""
         

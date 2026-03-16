@@ -1,13 +1,3 @@
-"""
-Security module — JWT authentication & password hashing for Admin API.
-
-Environment variables (optional overrides):
-    ADMIN_USERNAME   – admin login name   (default: "admin")
-    ADMIN_PASSWORD   – admin password     (default: "admin123")
-    JWT_SECRET_KEY   – HMAC signing key   (default: auto-generated, prints warning)
-    JWT_ALGORITHM    – signing algorithm  (default: "HS256")
-    JWT_EXPIRE_DAYS  – token lifetime     (default: 1)
-"""
 import os
 import secrets
 import logging
@@ -62,7 +52,6 @@ def create_access_token(
     data: dict,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
-    """Create a signed JWT access token."""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(days=JWT_EXPIRE_DAYS)
@@ -72,7 +61,6 @@ def create_access_token(
 
 
 def decode_access_token(token: str) -> dict:
-    """Decode and validate a JWT token. Raises JWTError on failure."""
     return jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
 
 
@@ -85,12 +73,6 @@ _bearer_scheme = HTTPBearer()
 async def get_current_admin(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
 ) -> str:
-    """
-    FastAPI dependency that validates the Bearer token from the
-    Authorization header and returns the admin username.
-
-    Raises 401 if the token is missing, expired, or invalid.
-    """
     token = credentials.credentials
     try:
         payload = decode_access_token(token)

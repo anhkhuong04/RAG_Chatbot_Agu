@@ -167,18 +167,9 @@ class Settings(BaseSettings):
 
 @lru_cache()
 def get_settings() -> Settings:
-    """
-    Get cached settings instance.
-    
-    Uses lru_cache to ensure settings are only loaded once.
-    
-    Returns:
-        Settings instance
-    """
     return Settings()
 
 
 # Convenience function to get retrieval settings
 def get_retrieval_settings() -> RetrievalSettings:
-    """Get retrieval settings"""
     return get_settings().retrieval

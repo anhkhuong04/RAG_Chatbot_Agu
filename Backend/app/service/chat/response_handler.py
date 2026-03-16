@@ -27,11 +27,6 @@ class ResponseHandler:
     """Handles LLM response generation for all intent types."""
 
     def __init__(self, get_intent_prompt_fn):
-        """
-        Args:
-            get_intent_prompt_fn: Callable(intent: str) -> str that returns
-                                  the intent-specific prompt template.
-        """
         self._get_intent_prompt = get_intent_prompt_fn
 
     # ------------------------------------------------------------------
@@ -39,7 +34,6 @@ class ResponseHandler:
     # ------------------------------------------------------------------
 
     async def handle_chitchat(self, history: List[ChatMessage], message: str) -> str:
-        """Handle chitchat messages using LLM with conversation history."""
         try:
             messages = [
                 ChatMessage(role=MessageRole.SYSTEM, content=CHITCHAT_SYSTEM_PROMPT)
@@ -60,7 +54,6 @@ class ResponseHandler:
     async def handle_chitchat_stream(
         self, history: List[ChatMessage], message: str
     ) -> AsyncGenerator[str, None]:
-        """Handle chitchat messages using streaming LLM."""
         try:
             messages = [
                 ChatMessage(role=MessageRole.SYSTEM, content=CHITCHAT_SYSTEM_PROMPT)
@@ -84,7 +77,6 @@ class ResponseHandler:
     async def handle_career_advice(
         self, history: List[ChatMessage], message: str
     ) -> str:
-        """Handle career advice using LLM base knowledge (no Qdrant retrieval)."""
         try:
             career_prompt = self._get_intent_prompt("career_advice")
             messages = [
@@ -106,7 +98,6 @@ class ResponseHandler:
     async def handle_career_advice_stream(
         self, history: List[ChatMessage], message: str
     ) -> AsyncGenerator[str, None]:
-        """Handle career advice messages using streaming LLM."""
         try:
             career_prompt = self._get_intent_prompt("career_advice")
             messages = [
@@ -137,10 +128,6 @@ class ResponseHandler:
         nodes: List[NodeWithScore],
         intent: str = "general",
     ) -> str:
-        """
-        Synthesize final response from retrieved nodes using LLM.
-        Uses intent-specific prompts for better response quality.
-        """
         try:
             if Settings.llm is None:
                 logger.error("LLM not initialized in Settings")
@@ -192,7 +179,6 @@ class ResponseHandler:
         nodes: List[NodeWithScore],
         intent: str = "general",
     ) -> AsyncGenerator[str, None]:
-        """Stream the LLM synthesis step for RAG responses."""
         try:
             if Settings.llm is None:
                 yield "Xin lỗi, hệ thống LLM chưa được khởi tạo."
@@ -231,7 +217,6 @@ class ResponseHandler:
 
     @staticmethod
     def _build_context(nodes: List[NodeWithScore]) -> str | None:
-        """Build context string from retrieved nodes."""
         context_parts = []
         for i, node in enumerate(nodes, 1):
             try:
@@ -257,15 +242,6 @@ class ResponseHandler:
 
     @staticmethod
     def extract_sources(nodes: List[NodeWithScore]) -> List[str]:
-        """
-        Extract source information from nodes.
-
-        Args:
-            nodes: List of NodeWithScore
-
-        Returns:
-            List of formatted source strings
-        """
         sources = []
         for node in nodes:
             metadata = node.node.metadata if hasattr(node.node, "metadata") else {}

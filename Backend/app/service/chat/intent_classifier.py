@@ -115,21 +115,6 @@ class IntentClassifier:
     """Hybrid intent classifier: keyword → regex/fuzzy → LLM fallback."""
 
     async def classify(self, message: str) -> str:
-        """
-        Classify user message intent using a 3-step hybrid approach.
-
-        Priority (highest first):
-        1. Keyword fast-path (deterministic, instant)
-        2. Regex + fuzzy matching (instant, handles typos/no-diacritics)
-        3. LLM fallback (async, handles novel phrasing)
-
-        Args:
-            message: User's message
-
-        Returns:
-            One of: "CHITCHAT", "QUERY_DOCS", "QUERY_SCORES", "QUERY_FEES", "CAREER_ADVICE"
-        """
-        # Step 1: Keyword fast-path (existing logic — instant)
         keyword_result = self._classify_by_keywords(message)
         if keyword_result is not None:
             logger.debug(f"Intent (keyword): {keyword_result}")
@@ -152,10 +137,6 @@ class IntentClassifier:
 
     @staticmethod
     def _classify_by_keywords(message: str) -> Optional[str]:
-        """
-        Keyword-based classification for clear-cut cases.
-        Returns None if no confident match — signals to try next step.
-        """
         message_lower = message.lower().strip()
         words = message_lower.split()
         word_count = len(words)
@@ -201,10 +182,6 @@ class IntentClassifier:
 
     @staticmethod
     def _classify_by_regex_fuzzy(message: str) -> Optional[str]:
-        """
-        Regex (word-boundary) + fuzzy matching (difflib) for typos
-        and no-diacritics input. Returns None if confidence is too low.
-        """
         message_lower = message.lower()
 
         # 2a. Regex match (handles exact, no-diacritics, extra spaces)
@@ -249,10 +226,6 @@ class IntentClassifier:
 
     @staticmethod
     async def _classify_by_llm(message: str) -> str:
-        """
-        Use LLM to classify intent when keyword/regex/fuzzy all failed.
-        Falls back to QUERY_DOCS if LLM is unavailable or returns garbage.
-        """
         try:
             if Settings.llm is None:
                 logger.warning("LLM not available for intent classification, defaulting to QUERY_DOCS")
@@ -288,7 +261,6 @@ class IntentClassifier:
 
     @staticmethod
     def get_fine_intent(routing_intent: str) -> str:
-        """Convert routing intent (QUERY_SCORES) to fine-grained (diem_chuan) for prompt selection."""
         return ROUTING_TO_FINE.get(routing_intent, "general")
 
     # ------------------------------------------------------------------
@@ -302,10 +274,6 @@ class IntentClassifier:
         latest_diem_chuan_year: int | None,
         latest_hoc_phi_year: int | None,
     ) -> str | None:
-        """
-        Check if user is asking about a year that has no data yet.
-        Returns a polite correction message if so, otherwise None.
-        """
         years_mentioned = re.findall(r'\b(20[2-9][0-9])\b', message)
         if not years_mentioned:
             return None

@@ -1,6 +1,3 @@
-# Prompts module for ChatService
-# This module contains all prompt templates and constants for the chatbot
-
 from .constants import (
     CHITCHAT_KEYWORDS,
     QUERY_INDICATORS,

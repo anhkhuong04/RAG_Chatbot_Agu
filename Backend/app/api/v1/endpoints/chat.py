@@ -24,7 +24,6 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = None
 
     def get_session_id(self) -> Optional[str]:
-        """Return session_id or conversation_id (frontend compat)"""
         return self.session_id or self.conversation_id
 
 
@@ -56,7 +55,6 @@ _chat_service: Optional[ChatService] = None
 
 
 def get_chat_service() -> ChatService:
-    """Get ChatService singleton instance"""
     global _chat_service
     if _chat_service is None:
         _chat_service = ChatService()
@@ -69,16 +67,6 @@ def get_chat_service() -> ChatService:
 
 
 async def _sse_generator(chat_service: ChatService, session_id: str, message: str):
-    """
-    SSE event generator. Wraps the ChatService stream into SSE format.
-    
-    Event types:
-    - "token": a text chunk from the LLM
-    - "sources": JSON array of source strings (sent once after retrieval)
-    - "metadata": session info and detected intent
-    - "done": signals stream completion
-    - "error": signals an error
-    """
     try:
         # Detect intent before streaming
         intent = await chat_service._intent_classifier.classify(message)
@@ -136,14 +124,6 @@ async def _sse_generator(chat_service: ChatService, session_id: str, message: st
 @router.post("/stream")
 @router.post("/stream/")
 async def chat_stream(request: ChatRequest):
-    """
-    Stream a chat response using Server-Sent Events (SSE).
-    
-    - **message**: User's question
-    - **session_id**: Optional ID to continue existing conversation
-    
-    Returns SSE stream with events: metadata, sources, token, done, error
-    """
     if not request.message or not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
 
@@ -164,17 +144,6 @@ async def chat_stream(request: ChatRequest):
 @router.post("", response_model=ChatResponse)
 @router.post("/", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """
-    Send a message to the chatbot and get a RAG-based response.
-    
-    - **message**: User's question
-    - **conversation_id**: Optional ID to continue existing conversation
-    
-    Returns:
-    - **response**: AI-generated answer based on knowledge base
-    - **sources**: List of source documents used
-    - **conversation_id**: ID for continuing the conversation
-    """
     if not request.message or not request.message.strip():
         raise HTTPException(
             status_code=400,
@@ -209,11 +178,6 @@ async def chat(request: ChatRequest):
 
 @router.post("/reset", response_model=ResetResponse)
 async def reset_conversation(session_id: str):
-    """
-    Reset/delete a chat session.
-    
-    - **session_id**: ID of the session to reset
-    """
     try:
         chat_service = get_chat_service()
         success = chat_service.clear_session(session_id)
@@ -233,11 +197,6 @@ async def reset_conversation(session_id: str):
 
 @router.get("/history/{session_id}")
 async def get_history(session_id: str):
-    """
-    Get chat session history by ID.
-    
-    - **session_id**: ID of the session
-    """
     try:
         chat_service = get_chat_service()
         messages = chat_service.get_session_history(session_id)
