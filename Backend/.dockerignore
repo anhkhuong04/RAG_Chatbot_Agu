@@ -1,0 +1,26 @@
+# Python cache and virtual env
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Git and editor
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Tests, docs, local artifacts
+tests/
+docs/
+*.log
+.pytest_cache/
+.mypy_cache/
+
+# Runtime data / large local assets
+data/
+
+# Keep the image context lean
+Dockerfile

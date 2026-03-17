@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {!isCollapsed && (
         <div className="flex justify-center items-center pt-6 pb-4 bg-gradient-to-b from-gray-50 to-gray-100">
           <img
-            src="images/logo_agu.png"
+            src="/images/logo_agu.png"
             alt="AGU Logo"
             className="w-48 h-24 object-contain drop-shadow-lg"
             onClick={handleMain}

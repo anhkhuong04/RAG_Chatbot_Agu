@@ -36,7 +36,7 @@ const Header: React.FC = () => {
             className="flex items-center space-x-3"
           >
             <img
-              src="images/logo_vi.png"
+              src="/images/logo_vi.png"
               alt="Logo Trường Đại học An Giang"
               className="h-10 w-auto lg:h-12"
             />

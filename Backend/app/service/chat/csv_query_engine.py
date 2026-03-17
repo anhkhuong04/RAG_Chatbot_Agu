@@ -351,7 +351,8 @@ class CSVQueryEngine:
             f"TUYỆT ĐỐI KHÔNG dùng gán biến (KHÔNG 'result = ...') và KHÔNG gọi to_markdown/to_string."
         )
         try:
-            pandas_response = await asyncio.to_thread(engine.query, retry_message)
+            # PandasQueryEngine internally uses signal-based timeout; it must run on main thread.
+            pandas_response = engine.query(retry_message)
             raw_output = str(pandas_response)
             if raw_output in ("None", "", "none", "null"):
                 meta = getattr(pandas_response, "metadata", {}) or {}
@@ -372,7 +373,8 @@ class CSVQueryEngine:
         self, engine, message: str, source_label: str, intent: str = "general"
     ) -> tuple[str, List[str]]:
         try:
-            pandas_response = await asyncio.to_thread(engine.query, message)
+            # PandasQueryEngine internally uses signal-based timeout; it must run on main thread.
+            pandas_response = engine.query(message)
             raw_output = str(pandas_response)
 
             if raw_output in ("None", "", "none", "null"):
@@ -431,7 +433,8 @@ Hãy format kết quả trên thành câu trả lời cho câu hỏi: "{message}
         self, engine, message: str, source_label: str, intent: str = "general"
     ) -> AsyncGenerator[str, None]:
         try:
-            pandas_response = await asyncio.to_thread(engine.query, message)
+            # PandasQueryEngine internally uses signal-based timeout; it must run on main thread.
+            pandas_response = engine.query(message)
             raw_output = str(pandas_response)
 
             if raw_output in ("None", "", "none", "null"):

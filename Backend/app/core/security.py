@@ -28,8 +28,8 @@ def hash_password(password: str) -> str:
 # ---------------------------------------------------------------------------
 # Admin credentials (from env or defaults)
 # ---------------------------------------------------------------------------
-ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
-_raw_password: str = os.getenv("ADMIN_PASSWORD", "123")
+ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "Admin")
+_raw_password: str = os.getenv("ADMIN_PASSWORD", "123456")
 ADMIN_HASHED_PASSWORD: str = hash_password(_raw_password)
 
 # ---------------------------------------------------------------------------
