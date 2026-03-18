@@ -5,7 +5,7 @@ import os
 import glob
 import tempfile
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from pydantic import BaseModel
@@ -29,11 +29,9 @@ from app.models.prompt import PromptUpdate, PromptResponse, PromptRecord
 
 # Import Security utilities
 from app.core.security import (
-    verify_password,
+    verify_admin_credentials,
     create_access_token,
     get_current_admin,
-    ADMIN_USERNAME,
-    ADMIN_HASHED_PASSWORD,
 )
 
 router = APIRouter(prefix="/admin", tags=["Admin - Knowledge Base"])
@@ -133,15 +131,139 @@ def _cleanup_structured_files(doc: dict) -> list[str]:
     return deleted
 
 
+def _get_qdrant_client_and_collection() -> tuple[QdrantClient, str]:
+    qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL"))
+    collection_name = os.getenv("QDRANT_COLLECTION_NAME", "university_knowledge")
+    return qdrant_client, collection_name
+
+
+def _collect_qdrant_documents() -> Dict[str, Dict[str, Any]]:
+    """
+    Aggregate document-level metadata from Qdrant payloads.
+    Used to recover Mongo document records when Mongo data is reset.
+    """
+    qdrant_client, collection_name = _get_qdrant_client_and_collection()
+    documents: Dict[str, Dict[str, Any]] = {}
+    next_offset = None
+
+    while True:
+        points, next_offset = qdrant_client.scroll(
+            collection_name=collection_name,
+            limit=256,
+            with_payload=["doc_uuid", "filename", "source_doc", "year", "category", "description"],
+            with_vectors=False,
+            offset=next_offset,
+        )
+
+        if not points:
+            break
+
+        for point in points:
+            payload = point.payload or {}
+            doc_uuid = payload.get("doc_uuid")
+            if not doc_uuid:
+                continue
+
+            record = documents.setdefault(
+                doc_uuid,
+                {
+                    "doc_uuid": doc_uuid,
+                    "filename": payload.get("filename") or payload.get("source_doc") or f"Recovered-{doc_uuid[:8]}",
+                    "metadata": {
+                        "year": payload.get("year"),
+                        "category": payload.get("category"),
+                        "description": payload.get("description"),
+                    },
+                    "chunk_count": 0,
+                },
+            )
+
+            record["chunk_count"] += 1
+
+            # Fill missing values from later points when needed.
+            if not record["filename"] and (payload.get("filename") or payload.get("source_doc")):
+                record["filename"] = payload.get("filename") or payload.get("source_doc")
+            if record["metadata"].get("year") is None and payload.get("year") is not None:
+                record["metadata"]["year"] = payload.get("year")
+            if not record["metadata"].get("category") and payload.get("category"):
+                record["metadata"]["category"] = payload.get("category")
+            if not record["metadata"].get("description") and payload.get("description"):
+                record["metadata"]["description"] = payload.get("description")
+
+        if next_offset is None:
+            break
+
+    return documents
+
+
+def _reconcile_mongo_documents_from_qdrant(collection) -> int:
+    """
+    Recreate missing Mongo document records from Qdrant payload metadata.
+    Returns the number of recovered Mongo records.
+    """
+    qdrant_docs = _collect_qdrant_documents()
+    if not qdrant_docs:
+        return 0
+
+    existing_doc_uuids = set(collection.distinct("doc_uuid"))
+    recovered_count = 0
+
+    for doc_uuid, qdrant_doc in qdrant_docs.items():
+        if doc_uuid in existing_doc_uuids:
+            continue
+
+        now = datetime.now()
+        collection.insert_one(
+            {
+                "doc_uuid": doc_uuid,
+                "filename": qdrant_doc["filename"],
+                "metadata": qdrant_doc["metadata"],
+                "status": "INDEXED",
+                "storage_type": "qdrant",
+                "chunk_count": qdrant_doc["chunk_count"],
+                "created_at": now,
+                "indexed_at": now,
+                "recovered_from_qdrant": True,
+            }
+        )
+        recovered_count += 1
+
+    return recovered_count
+
+
+def _count_and_delete_qdrant_vectors(doc_uuid: str) -> int:
+    qdrant_client, collection_name = _get_qdrant_client_and_collection()
+    qdrant_filter = Filter(
+        must=[
+            FieldCondition(
+                key="doc_uuid",
+                match=MatchValue(value=doc_uuid),
+            )
+        ]
+    )
+
+    count_result = qdrant_client.count(
+        collection_name=collection_name,
+        count_filter=qdrant_filter,
+        exact=True,
+    )
+    qdrant_deleted = int(getattr(count_result, "count", 0) or 0)
+
+    qdrant_client.delete(
+        collection_name=collection_name,
+        points_selector=qdrant_filter,
+    )
+
+    return qdrant_deleted
+
+
 # ============================================
 # AUTH ENDPOINT
 # ============================================
 
 @router.post("/login", response_model=TokenResponse)
 async def admin_login(body: LoginRequest):
-    if body.username != ADMIN_USERNAME or not verify_password(
-        body.password, ADMIN_HASHED_PASSWORD
-    ):
+    if not verify_admin_credentials(body.username, body.password):
         raise HTTPException(
             status_code=401,
             detail="Incorrect username or password",
@@ -218,6 +340,14 @@ async def upload_document(
 async def list_documents(_admin: str = Depends(get_current_admin)):
     try:
         collection = get_mongo_collection()
+
+        # Self-heal admin listing after Mongo reset by recovering records from Qdrant.
+        try:
+            recovered = _reconcile_mongo_documents_from_qdrant(collection)
+            if recovered:
+                print(f"♻️ Recovered {recovered} document records from Qdrant into MongoDB")
+        except Exception as recover_error:
+            print(f"⚠️ Warning: Failed to reconcile MongoDB from Qdrant: {recover_error}")
         
         # Fetch all documents, sorted by created_at descending
         cursor = collection.find({}).sort("created_at", -1)
@@ -255,30 +385,37 @@ async def delete_document(doc_uuid: str, _admin: str = Depends(get_current_admin
         # Step 1: Check if document exists in MongoDB
         doc = collection.find_one({"doc_uuid": doc_uuid})
         if not doc:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Document with uuid '{doc_uuid}' not found"
-            )
+            # Mongo may have been reset; still allow deletion directly from Qdrant.
+            try:
+                qdrant_deleted = _count_and_delete_qdrant_vectors(doc_uuid)
+                if qdrant_deleted <= 0:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Document with uuid '{doc_uuid}' not found in MongoDB or Qdrant"
+                    )
+
+                return {
+                    "status": "deleted",
+                    "doc_uuid": doc_uuid,
+                    "mongodb_deleted": False,
+                    "qdrant_vectors_deleted": qdrant_deleted,
+                    "csv_files_deleted": [],
+                    "note": "Deleted from Qdrant only (MongoDB metadata was missing)",
+                }
+            except HTTPException:
+                raise
+            except Exception as qdrant_only_error:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Failed to delete orphaned Qdrant document: {str(qdrant_only_error)}"
+                )
         
         # Step 2: Delete vectors from Qdrant (for non-CSV documents)
         qdrant_deleted = 0
         try:
-            qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL"))
-            collection_name = os.getenv("QDRANT_COLLECTION_NAME", "university_knowledge")
-            
-            # Delete all points with matching doc_uuid
-            qdrant_client.delete(
-                collection_name=collection_name,
-                points_selector=Filter(
-                    must=[
-                        FieldCondition(
-                            key="doc_uuid",
-                            match=MatchValue(value=doc_uuid)
-                        )
-                    ]
-                )
-            )
-            qdrant_deleted = doc.get("chunk_count", 0)
+            qdrant_deleted = _count_and_delete_qdrant_vectors(doc_uuid)
+            if qdrant_deleted == 0:
+                qdrant_deleted = doc.get("chunk_count", 0)
             print(f"🗑️ Deleted ~{qdrant_deleted} vectors from Qdrant for doc: {doc_uuid}")
             
         except Exception as qdrant_error:

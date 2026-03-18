@@ -104,12 +104,12 @@ Quy tắc:
         self.max_expanded_queries = max_expanded_queries
         
         logger.info(
-            f"✅ QueryRewriter initialized "
+            f"QueryRewriter initialized "
             f"(rewrite={enable_rewrite}, expand={enable_expansion}, keywords={enable_keywords})"
         )
     
     async def rewrite(self, query: str) -> RewrittenQuery:
-        logger.info(f"📝 Rewriting query: {query[:50]}...")
+        logger.info(f"Rewriting query: {query[:50]}...")
         
         # Initialize result
         result = RewrittenQuery(
@@ -147,7 +147,7 @@ Quy tắc:
             # Process rewrite result
             if "rewrite" in tasks:
                 if isinstance(tasks["rewrite"], Exception):
-                    logger.warning(f"⚠️ Rewrite task failed: {tasks['rewrite']}")
+                    logger.warning(f"Rewrite task failed: {tasks['rewrite']}")
                 else:
                     result.rewritten = tasks["rewrite"]
                     logger.debug(f"   Rewritten: {result.rewritten}")
@@ -156,7 +156,7 @@ Quy tắc:
             # the expansion already ran in parallel on the original query which is acceptable.
             if "expand" in tasks:
                 if isinstance(tasks["expand"], Exception):
-                    logger.warning(f"⚠️ Expand task failed: {tasks['expand']}")
+                    logger.warning(f"Expand task failed: {tasks['expand']}")
                 else:
                     result.expanded_queries = tasks["expand"]
                     logger.debug(f"   Expanded: {len(result.expanded_queries)} queries")
@@ -164,18 +164,18 @@ Quy tắc:
             # Process keywords result
             if "keywords" in tasks:
                 if isinstance(tasks["keywords"], Exception):
-                    logger.warning(f"⚠️ Keywords task failed: {tasks['keywords']}")
+                    logger.warning(f"Keywords task failed: {tasks['keywords']}")
                 else:
                     result.extracted_keywords = tasks["keywords"]
                     logger.debug(f"   Keywords: {result.extracted_keywords}")
             
             logger.info(
-                f"✅ Query rewritten: '{query[:30]}...' → '{result.rewritten[:30]}...' "
+                f"Query rewritten: '{query[:30]}...' → '{result.rewritten[:30]}...' "
                 f"(+{len(result.expanded_queries)} variants, {len(result.extracted_keywords)} keywords)"
             )
             
         except Exception as e:
-            logger.error(f"❌ Query rewrite error: {e}")
+            logger.error(f"Query rewrite error: {e}")
             # Return original query on error
         
         return result
@@ -187,7 +187,7 @@ Quy tắc:
         try:
             return await self._rewrite_query(query)
         except Exception as e:
-            logger.error(f"❌ Simple rewrite error: {e}")
+            logger.error(f"Simple rewrite error: {e}")
             return query
     
     async def _rewrite_query(self, query: str) -> str:

@@ -1,15 +1,3 @@
-"""
-Dynamic Prompt Service with in-memory caching.
-
-Manages intent prompts stored in MongoDB 'prompts' collection.
-Falls back to hardcoded INTENT_PROMPTS if DB is empty or unavailable.
-
-Cache Strategy:
-  - Prompts are loaded from MongoDB on first access (lazy loading)
-  - Cached in a thread-safe dict keyed by intent_name
-  - Cache is invalidated explicitly via invalidate_cache()
-  - Falls back to hardcoded INTENT_PROMPTS if MongoDB is empty/unavailable
-"""
 import os
 import logging
 import threading
@@ -28,14 +16,6 @@ logger = logging.getLogger(__name__)
 
 
 class PromptService:
-    """
-    Service for managing dynamic prompts with in-memory caching.
-    
-    Usage:
-        service = get_prompt_service()
-        prompt = service.get_intent_prompt("diem_chuan")
-    """
-
     def __init__(self):
         self.mongo_client = MongoClient(os.getenv("MONGO_URI"))
         self.db = self.mongo_client["university_db"]
@@ -59,11 +39,11 @@ class PromptService:
     def _seed_defaults_if_empty(self):
         if self.collection.count_documents({}) > 0:
             logger.info(
-                f"📋 Prompts collection already has {self.collection.count_documents({})} documents — skipping seed."
+                f"Prompts collection already has {self.collection.count_documents({})} documents — skipping seed."
             )
             return
 
-        logger.info("📋 Seeding prompts collection with hardcoded defaults...")
+        logger.info("Seeding prompts collection with hardcoded defaults...")
         now = datetime.utcnow()
 
         # Description mapping for better admin UX
@@ -86,9 +66,9 @@ class PromptService:
             }
             try:
                 self.collection.insert_one(doc)
-                logger.info(f"  ✅ Seeded prompt: {intent_name}")
+                logger.info(f"Seeded prompt: {intent_name}")
             except Exception as e:
-                logger.warning(f"  ⚠️ Failed to seed prompt {intent_name}: {e}")
+                logger.warning(f"Failed to seed prompt {intent_name}: {e}")
 
     # ============================================
     # CACHE MANAGEMENT
@@ -111,15 +91,15 @@ class PromptService:
                     doc_copy = {k: v for k, v in doc.items() if k != "_id"}
                     self._full_cache[intent] = doc_copy
 
-                logger.info(f"📋 Loaded {len(self._cache)} prompts into cache")
+                logger.info(f"Loaded {len(self._cache)} prompts into cache")
 
                 # If cache is empty (all inactive or DB issue), fallback
                 if not self._cache:
-                    logger.warning("📋 No active prompts in DB — using hardcoded fallback")
+                    logger.warning("No active prompts in DB — using hardcoded fallback")
                     self._cache = dict(HARDCODED_INTENT_PROMPTS)
 
             except Exception as e:
-                logger.error(f"📋 Failed to load prompts from MongoDB: {e}")
+                logger.error(f"Failed to load prompts from MongoDB: {e}")
                 self._cache = dict(HARDCODED_INTENT_PROMPTS)
                 self._full_cache = {}
 
@@ -127,7 +107,7 @@ class PromptService:
         with self._cache_lock:
             self._cache = None
             self._full_cache = None
-            logger.info("📋 Prompt cache invalidated")
+            logger.info("Prompt cache invalidated")
 
     # ============================================
     # PROMPT ACCESS (used by ChatService)
@@ -178,7 +158,7 @@ class PromptService:
             result.pop("_id", None)
             # Invalidate cache so next chat request picks up changes
             self.invalidate_cache()
-            logger.info(f"📋 Updated prompt: {intent_name}")
+            logger.info(f"Updated prompt: {intent_name}")
 
         return result
 
@@ -189,7 +169,7 @@ class PromptService:
         self.collection.insert_one(doc)
         doc.pop("_id", None)
         self.invalidate_cache()
-        logger.info(f"📋 Created prompt: {record.intent_name}")
+        logger.info(f"Created prompt: {record.intent_name}")
         return doc
 
 

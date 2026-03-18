@@ -1,7 +1,3 @@
-"""
-Metadata Filter Service for Dynamic Query Filtering
-Extracts year, category, and other filters from user queries
-"""
 import re
 import logging
 from typing import List, Dict, Optional, Any
@@ -19,14 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 class MetadataFilterService:
-    """
-    Service for extracting and applying metadata filters to RAG queries.
-    
-    Extracts:
-    - Year from query (e.g., "năm 2025", "2026")
-    - Category from keywords (e.g., "điểm chuẩn", "học phí")
-    """
-    
     # Patterns to extract year from Vietnamese queries
     YEAR_PATTERNS = [
         r'năm\s*(\d{4})',           # "năm 2025"
@@ -66,7 +54,7 @@ class MetadataFilterService:
     
     def __init__(self, default_year: Optional[int] = None):
         self.default_year = default_year or datetime.now().year
-        logger.info(f"✅ MetadataFilterService initialized (default_year={self.default_year})")
+        logger.info(f"MetadataFilterService initialized (default_year={self.default_year})")
     
     def extract_filters(self, query: str) -> Dict[str, Any]:
         filters = {}
@@ -83,7 +71,7 @@ class MetadataFilterService:
             filters["category"] = category
         
         if filters:
-            logger.debug(f"📋 Extracted filters: {filters}")
+            logger.debug(f"Extracted filters: {filters}")
         
         return filters
     
@@ -186,12 +174,12 @@ class MetadataFilterService:
         # Fallback behavior
         if not filtered and not strict:
             logger.warning(
-                f"⚠️ No nodes matched filters {filters}. "
+                f"No nodes matched filters {filters}. "
                 f"Returning all {len(nodes)} nodes."
             )
             return nodes
         
-        logger.debug(f"📋 Post-filter: {len(nodes)} → {len(filtered)} nodes")
+        logger.debug(f"Post-filter: {len(nodes)} → {len(filtered)} nodes")
         return filtered
     
     def get_filter_summary(self, filters: Dict[str, Any]) -> str:

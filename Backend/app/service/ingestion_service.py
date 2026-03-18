@@ -168,7 +168,7 @@ class IngestionService:
             raise ValueError(f"Unsupported file format: {ext}. Supported: {self.SUPPORTED_EXTENSIONS}")
         
         doc_uuid = str(uuid.uuid4())
-        print(f"🔄 Processing file: {filename} (ID: {doc_uuid})...")
+        print(f"Processing file: {filename} (ID: {doc_uuid})...")
 
         # --- STEP 1: SAVE METADATA TO MONGODB (PENDING) ---
         doc_record = {
@@ -193,7 +193,7 @@ class IngestionService:
             if not documents:
                 raise ValueError(f"No content extracted from file: {filename}")
             
-            print(f"📄 Loaded {len(documents)} document(s) from {ext} file (method: {parsing_method})")
+            print(f"Loaded {len(documents)} document(s) from {ext} file (method: {parsing_method})")
             
             # Add parsing method to metadata for tracking
             metadata["parsing_method"] = parsing_method
@@ -220,7 +220,7 @@ class IngestionService:
                     }}
                 )
                 
-                print(f"✅ Successfully extracted to CSV: {csv_path} ({row_count} rows)")
+                print(f"Successfully extracted to CSV: {csv_path} ({row_count} rows)")
             else:
                 # Text data path: chunk, embed, index to Qdrant
                 chunk_count = self._index_nodes(documents, metadata, doc_uuid)
@@ -242,7 +242,7 @@ class IngestionService:
 
         except Exception as e:
             # Update MongoDB with error status
-            print(f"❌ Error: {str(e)}")
+            print(f"Error: {str(e)}")
             self.doc_collection.update_one(
                 {"doc_uuid": doc_uuid},
                 {"$set": {
@@ -272,16 +272,16 @@ class IngestionService:
         
         # Admission Scores: "Điểm chuẩn" or "Tuyển sinh" (contains score tables)
         if any(keyword in category_lower for keyword in ["điểm chuẩn", "diem chuan"]):
-            logger.info(f"🎯 Using ADMISSION_SCORE_INSTRUCTION for category: {category}")
+            logger.info(f"Using ADMISSION_SCORE_INSTRUCTION for category: {category}")
             return self.ADMISSION_SCORE_INSTRUCTION, True
         
         # Tuition Fees: "Học phí"
         if any(keyword in category_lower for keyword in ["học phí", "hoc phi"]):
-            logger.info(f"💰 Using TUITION_FEE_INSTRUCTION for category: {category}")
+            logger.info(f"Using TUITION_FEE_INSTRUCTION for category: {category}")
             return self.TUITION_FEE_INSTRUCTION, True
         
         # Default instruction for other categories
-        logger.info(f"📄 Using DEFAULT_PARSING_INSTRUCTION for category: {category}")
+        logger.info(f"Using DEFAULT_PARSING_INSTRUCTION for category: {category}")
         return self.DEFAULT_PARSING_INSTRUCTION, False
     
     def _load_with_llama_parse(self, file_path: str, category: str = None) -> tuple[list, str]:
@@ -299,8 +299,8 @@ class IngestionService:
             
             parse_method = self.PARSE_METHOD_LLAMA_CUSTOM if is_custom else self.PARSE_METHOD_LLAMA
             
-            logger.info(f"📊 Using LlamaParse for PDF: {os.path.basename(file_path)} (custom={is_custom})")
-            print(f"🔄 Parsing PDF with {'CUSTOM' if is_custom else 'DEFAULT'} instruction for category: {category or 'None'}")
+            logger.info(f"Using LlamaParse for PDF: {os.path.basename(file_path)} (custom={is_custom})")
+            print(f"Parsing PDF with {'CUSTOM' if is_custom else 'DEFAULT'} instruction for category: {category or 'None'}")
             
             documents = parser.load_data(file_path)
             
@@ -310,19 +310,19 @@ class IngestionService:
                     doc.metadata['parsing_strategy'] = parse_method
                     doc.metadata['parsing_category'] = category or 'general'
                 
-                logger.info(f"✅ LlamaParse successfully extracted {len(documents)} document(s)")
+                logger.info(f"LlamaParse successfully extracted {len(documents)} document(s)")
                 return documents, parse_method
             else:
                 raise ValueError("LlamaParse returned empty documents")
                 
         except Exception as e:
             # Fallback to SimpleDirectoryReader if LlamaParse fails
-            logger.warning(f"⚠️ LlamaParse failed: {str(e)}. Fallback to standard parser.")
-            print(f"⚠️ Fallback to standard parser due to: {str(e)}")
+            logger.warning(f"LlamaParse failed: {str(e)}. Fallback to standard parser.")
+            print(f"Fallback to standard parser due to: {str(e)}")
             return self._load_with_simple_reader(file_path)
     
     def _load_rtf(self, file_path: str) -> tuple[list, str]:
-        logger.info(f"📄 Loading RTF file: {os.path.basename(file_path)}")
+        logger.info(f"Loading RTF file: {os.path.basename(file_path)}")
         with open(file_path, 'r', encoding='utf-8') as f:
             rtf_content = f.read()
         plain_text = rtf_to_text(rtf_content)
@@ -330,7 +330,7 @@ class IngestionService:
         return [doc], self.PARSE_METHOD_SIMPLE
 
     def _load_with_simple_reader(self, file_path: str) -> tuple[list, str]:
-        logger.info(f"📄 Using SimpleDirectoryReader for: {os.path.basename(file_path)}")
+        logger.info(f"Loading file with SimpleDirectoryReader: {os.path.basename(file_path)}")
         reader = SimpleDirectoryReader(
             input_files=[file_path],
             filename_as_id=True
@@ -366,7 +366,7 @@ class IngestionService:
         # Enrich nodes with section context
         nodes = self._enrich_nodes_with_context(nodes, metadata)
         
-        print(f"Split into {len(nodes)} chunks")
+        logger.info(f"Split into {len(nodes)} chunks")
 
         # Index to Qdrant
         vector_store = QdrantVectorStore(
@@ -461,7 +461,7 @@ class IngestionService:
                 continue
             
             try:
-                logger.info(f"🔍 Extracting admission scores from document node {i+1}/{len(documents)}")
+                logger.info(f"Extracting admission scores from document node {i+1}/{len(documents)}")
                 
                 # Use LLM structured prediction with Pydantic schema
                 extraction = Settings.llm.structured_predict(
@@ -472,17 +472,17 @@ class IngestionService:
                 
                 if extraction.records:
                     all_records.extend(extraction.records)
-                    logger.info(f"  ✅ Extracted {len(extraction.records)} records from node {i+1}")
+                    logger.info(f"Extracted {len(extraction.records)} records from node {i+1}")
                 
                 if extraction.metadata_notes:
                     all_notes.update(extraction.metadata_notes)
                     
             except Exception as e:
-                logger.warning(f"⚠️ Failed to extract from node {i+1}: {e}")
+                logger.warning(f"Failed to extract from node {i+1}: {e}")
                 continue
         
         if not all_records:
-            logger.warning("❌ No admission records extracted from any node")
+            logger.warning("No admission records extracted from any node")
             return None, 0
         
         # Flatten records to tabular format
@@ -503,8 +503,8 @@ class IngestionService:
         # Save CSV
         csv_path = os.path.join(self.STRUCTURED_DATA_DIR, f"diem_chuan_{year}.csv")
         df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-        logger.info(f"📊 Saved {len(df)} rows to {csv_path}")
-        print(f"📊 Saved {len(df)} rows to {csv_path}")
+        logger.info(f"Saved {len(df)} rows to {csv_path}")
+        print(f"Saved {len(df)} rows to {csv_path}")
         
         # Save metadata notes
         if all_notes:
@@ -512,8 +512,8 @@ class IngestionService:
             with open(notes_path, 'w', encoding='utf-8') as f:
                 for note in sorted(all_notes):
                     f.write(f"- {note}\n")
-            logger.info(f"📝 Saved {len(all_notes)} metadata notes to {notes_path}")
-            print(f"📝 Saved {len(all_notes)} notes to {notes_path}")
+            logger.info(f"Saved {len(all_notes)} metadata notes to {notes_path}")
+            print(f"Saved {len(all_notes)} notes to {notes_path}")
         
         return csv_path, len(df)
     
@@ -538,7 +538,7 @@ class IngestionService:
                 continue
             
             try:
-                logger.info(f"🔍 Extracting tuition fees from document node {i+1}/{len(documents)}")
+                logger.info(f"Extracting tuition fees from document node {i+1}/{len(documents)}")
                 
                 # Use LLM structured prediction with Pydantic schema
                 extraction = Settings.llm.structured_predict(
@@ -553,17 +553,17 @@ class IngestionService:
                     if doi_tuong not in groups:
                         groups[doi_tuong] = []
                     groups[doi_tuong].extend(extraction.records)
-                    logger.info(f"  ✅ Extracted {len(extraction.records)} records for '{doi_tuong}' from node {i+1}")
+                    logger.info(f"Extracted {len(extraction.records)} records for '{doi_tuong}' from node {i+1}")
                 
                 if extraction.metadata_notes:
                     all_notes.update(extraction.metadata_notes)
                     
             except Exception as e:
-                logger.warning(f"⚠️ Failed to extract from node {i+1}: {e}")
+                logger.warning(f"Failed to extract from node {i+1}: {e}")
                 continue
         
         if not groups:
-            logger.warning("❌ No tuition records extracted from any node")
+            logger.warning("No tuition records extracted from any node")
             return None, 0
         
         # Save each group as separate CSV
@@ -585,8 +585,8 @@ class IngestionService:
             df.to_csv(csv_path, index=False, encoding='utf-8-sig')
             saved_paths.append(csv_path)
             total_rows += len(df)
-            logger.info(f"📊 Saved {len(df)} rows to {csv_path} (đối tượng: {doi_tuong})")
-            print(f"📊 Saved {len(df)} rows to {csv_path} (đối tượng: {doi_tuong})")
+            logger.info(f"Saved {len(df)} rows to {csv_path} (đối tượng: {doi_tuong})")
+            print(f"Saved {len(df)} rows to {csv_path} (đối tượng: {doi_tuong})")
         
         # Save metadata notes (hệ số Thạc sĩ, Tiến sĩ, VLVH...)
         if all_notes:
@@ -594,8 +594,8 @@ class IngestionService:
             with open(notes_path, 'w', encoding='utf-8') as f:
                 for note in sorted(all_notes):
                     f.write(f"- {note}\n")
-            logger.info(f"📝 Saved {len(all_notes)} metadata notes to {notes_path}")
-            print(f"📝 Saved {len(all_notes)} notes to {notes_path}")
+            logger.info(f"Saved {len(all_notes)} metadata notes to {notes_path}")
+            print(f"Saved {len(all_notes)} notes to {notes_path}")
         
         if saved_paths:
             return saved_paths[0], total_rows

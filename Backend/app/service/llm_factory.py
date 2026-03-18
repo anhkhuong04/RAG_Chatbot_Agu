@@ -30,7 +30,7 @@ def init_settings():
     Settings.chunk_size = 1024
     Settings.chunk_overlap = 200
     
-    print(f"✅ LlamaIndex Settings initialized ({llm_cfg.llm_model} + {llm_cfg.embedding_model}, dim={llm_cfg.embedding_dimension})")
+    print(f"LlamaIndex Settings initialized ({llm_cfg.llm_model} + {llm_cfg.embedding_model}, dim={llm_cfg.embedding_dimension})")
 
 
 def get_llm():

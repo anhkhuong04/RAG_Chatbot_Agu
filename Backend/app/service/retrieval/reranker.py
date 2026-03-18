@@ -1,7 +1,3 @@
-"""
-Cross-Encoder Reranker for Advanced RAG
-Re-ranks retrieved nodes using a cross-encoder model for better relevance
-"""
 import asyncio
 import logging
 from typing import List, Optional
@@ -14,18 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class CrossEncoderReranker:
-    """
-    Cross-Encoder Reranker using sentence-transformers.
-    
-    Re-ranks a list of retrieved nodes by computing cross-encoder scores
-    between the query and each node's text.
-    
-    Attributes:
-        model: CrossEncoder model instance
-        top_n: Number of top results to return after reranking
-        model_name: Name of the cross-encoder model
-    """
-    
     # Available models (smaller → larger, faster → more accurate)
     MODELS = {
         "fast": "cross-encoder/ms-marco-MiniLM-L-6-v2",      # 80MB, fast
@@ -50,16 +34,16 @@ class CrossEncoderReranker:
         self.top_n = top_n
         
         # Initialize cross-encoder
-        logger.info(f"🔄 Loading reranker model: {model_name}")
+        logger.info(f"Loading reranker model: {model_name}")
         try:
             self.model = CrossEncoder(
                 model_name,
                 max_length=512,
                 device=device,
             )
-            logger.info(f"✅ Reranker initialized: {model_name}")
+            logger.info(f"Reranker initialized: {model_name}")
         except Exception as e:
-            logger.error(f"❌ Failed to load reranker: {e}")
+            logger.error(f"Failed to load reranker: {e}")
             raise
     
     async def rerank(
@@ -73,7 +57,7 @@ class CrossEncoderReranker:
         
         top_n = top_n or self.top_n
         
-        logger.debug(f"🔄 Reranking {len(nodes)} nodes...")
+        logger.debug(f"Reranking {len(nodes)} nodes...")
         
         # Prepare query-document pairs
         pairs = []
@@ -96,7 +80,7 @@ class CrossEncoderReranker:
                 ),
             )
         except Exception as e:
-            logger.error(f"❌ Reranking failed: {e}")
+            logger.error(f"Reranking failed: {e}")
             # Return original nodes if reranking fails
             return nodes[:top_n]
         
@@ -115,7 +99,7 @@ class CrossEncoderReranker:
             result.append(reranked_node)
         
         logger.info(
-            f"✅ Reranked {len(nodes)} → {len(result)} nodes "
+            f"Reranked {len(nodes)} → {len(result)} nodes "
             f"(scores: {result[0].score:.3f} to {result[-1].score:.3f})"
         )
         

@@ -9,7 +9,11 @@ import {
   Search,
 } from "lucide-react";
 import type { DocumentItem } from "../../../types/admin";
-import { STATUS_CONFIG, ACADEMIC_YEARS, CATEGORIES } from "../../../types/admin";
+import {
+  STATUS_CONFIG,
+  ACADEMIC_YEARS,
+  CATEGORIES,
+} from "../../../types/admin";
 
 interface DocumentListProps {
   documents: DocumentItem[];
@@ -191,7 +195,7 @@ export const DocumentList = ({
                 return (
                   <tr
                     key={doc.doc_uuid}
-                    className="hover:bg-gray-50/50 transition-colors"
+                    className="hover:bg-gray-50 transition-colors"
                   >
                     {/* Filename */}
                     <td className="py-3.5 px-6">
