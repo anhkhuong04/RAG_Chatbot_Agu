@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from dotenv import load_dotenv
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from passlib.context import CryptContext
@@ -32,6 +33,24 @@ ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "Admin")
 _raw_password: str = os.getenv("ADMIN_PASSWORD", "123456")
 ADMIN_HASHED_PASSWORD: str = hash_password(_raw_password)
 
+
+def get_admin_credentials(refresh_env: bool = False) -> tuple[str, str]:
+    """Return current admin credentials, optionally reloading values from .env."""
+    if refresh_env:
+        # Keep runtime/container environment variables authoritative.
+        load_dotenv(override=False)
+    username = os.getenv("ADMIN_USERNAME", "Admin")
+    password = os.getenv("ADMIN_PASSWORD", "123456")
+    return username, password
+
+
+def verify_admin_credentials(username: str, password: str) -> bool:
+    """Validate against the latest configured admin credentials."""
+    expected_username, expected_password = get_admin_credentials(refresh_env=True)
+    return secrets.compare_digest(username, expected_username) and secrets.compare_digest(
+        password, expected_password
+    )
+
 # ---------------------------------------------------------------------------
 # JWT configuration
 # ---------------------------------------------------------------------------
@@ -42,7 +61,7 @@ JWT_EXPIRE_DAYS: int = int(os.getenv("JWT_EXPIRE_DAYS", "1"))
 
 if JWT_SECRET_KEY == _default_secret:
     logger.warning(
-        "⚠️  JWT_SECRET_KEY not set — using a random key. "
+        "  JWT_SECRET_KEY not set — using a random key. "
         "Tokens will be invalidated on every server restart. "
         "Set JWT_SECRET_KEY in your .env for persistence."
     )

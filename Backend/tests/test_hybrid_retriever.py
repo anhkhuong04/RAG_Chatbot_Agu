@@ -1,10 +1,9 @@
 import asyncio
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-import pytest_asyncio
 
-from llama_index.core.schema import NodeWithScore, TextNode
+from llama_index.core.schema import TextNode
 
 
 # ---------------------------------------------------------------------------

@@ -1,90 +1,48 @@
 import os
 import re
 import uuid
+import hashlib
 import logging
 from datetime import datetime
-from pymongo import MongoClient
-from qdrant_client import QdrantClient
-from llama_index.core import VectorStoreIndex, StorageContext, SimpleDirectoryReader, Settings, PromptTemplate
+import pandas as pd
+from llama_index.core import VectorStoreIndex, StorageContext, SimpleDirectoryReader
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.schema import Document
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_parse import LlamaParse
-import pandas as pd
-from dotenv import load_dotenv
-from pydantic import BaseModel, Field
-from typing import List, Dict, Optional, Any
+from typing import List, Optional
 from striprtf.striprtf import rtf_to_text
 
-# Load environment variables
-load_dotenv()
 
 # Configure logging
 logger = logging.getLogger(__name__)
 
 # Import LLM settings
 from app.service.llm_factory import init_settings
-
-
-# ============================================
-# PYDANTIC SCHEMAS — Structured Output for LLM Extraction
-# ============================================
-
-# --- Admission Scores (Điểm chuẩn) ---
-class AdmissionRecord(BaseModel):
-    ma_nganh: str = Field(description="Mã ngành đào tạo (Ví dụ: 7480201)")
-    ten_nganh: str = Field(description="Tên ngành đào tạo (Ví dụ: Công nghệ thông tin)")
-    to_hop_mon: str = Field(description="Danh sách tổ hợp môn xét tuyển, phân cách bằng dấu phẩy (VD: 'A00, A01, C01, D01, D07'). Ghi đúng theo tài liệu gốc.")
-    pt1_dt23: Optional[float] = Field(default=None, description="Điểm chuẩn Phương thức 1 - Đối tượng 2,3 (xét tuyển thẳng). Null nếu không có.")
-    pt1_dt4: Optional[float] = Field(default=None, description="Điểm chuẩn Phương thức 1 - Đối tượng 4 (xét tuyển thẳng, có chứng chỉ ngoại ngữ). Null nếu không có.")
-    pt2: Optional[float] = Field(default=None, description="Điểm chuẩn Phương thức 2 - xét kết quả kỳ thi Đánh giá năng lực (ĐGNL) ĐHQG TP.HCM, thang điểm ~1200. Null nếu không xét.")
-    pt3_nhom1: Optional[float] = Field(default=None, description="Điểm chuẩn Phương thức 3 Nhóm 1 - xét kết quả thi tốt nghiệp THPT, tổ hợp nhóm 1. Null nếu không xét.")
-    pt3_nhom2: Optional[float] = Field(default=None, description="Điểm chuẩn Phương thức 3 Nhóm 2 - xét kết quả thi tốt nghiệp THPT, tổ hợp nhóm 2 (C00). Null nếu không xét.")
-    pt3_nhom3: Optional[float] = Field(default=None, description="Điểm chuẩn Phương thức 3 Nhóm 3 - xét kết quả thi tốt nghiệp THPT, tổ hợp nhóm 3. Null nếu không xét.")
-
-# Column mapping for CSV export
-ADMISSION_SCORE_COLUMNS = ["pt1_dt23", "pt1_dt4", "pt2", "pt3_nhom1", "pt3_nhom2", "pt3_nhom3"]
-
-class AdmissionTableExtraction(BaseModel):
-    records: List[AdmissionRecord] = Field(description="Danh sách điểm chuẩn của các ngành có trong trang tài liệu này")
-    metadata_notes: List[str] = Field(description="Danh sách các câu chú thích, giải thích từ viết tắt (PT1, PT2, ĐT2...) xuất hiện ở phần đầu hoặc cuối bảng/trang.")
-
-# --- Tuition Fees (Học phí) ---
-class TuitionRecord(BaseModel):
-    nganh_dao_tao: str = Field(description="Tên ngành, nhóm ngành hoặc khối ngành")
-    hoc_phi_hk1: Optional[float] = Field(description="Học phí học kỳ 1 (kiểu số nguyên/thực, đã bỏ dấu chấm ngàn)")
-    hoc_phi_hk2: Optional[float] = Field(description="Học phí học kỳ 2 (kiểu số nguyên/thực, đã bỏ dấu chấm ngàn)")
-
-class TuitionTableExtraction(BaseModel):
-    doi_tuong_ap_dung: str = Field(description="Đối tượng khóa học áp dụng (VD: 'Khóa 2026', 'Khóa 2025 trở về trước')")
-    records: List[TuitionRecord] = Field(description="Danh sách học phí của các ngành")
-    metadata_notes: List[str] = Field(description="Các ghi chú về quy định nhân hệ số học phí cho Thạc sĩ, Tiến sĩ, VLVH nếu có.")
+from app.core.config import get_settings
+from app.db import get_database, get_qdrant_client
 
 
 class IngestionService:
-    """Service for processing documents and indexing into vector database"""
-    
-    # Supported file extensions
-    SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.docx', '.rtf', '.jpg', '.jpeg', '.png'}
-    
-    # Extensions that use LlamaParse (PDF for better table parsing)
+    """Service for processing documents and indexing into vector database."""
+
+    # ── Supported formats ──────────────────────────────────────────────
+    SUPPORTED_EXTENSIONS = {'.pdf', '.txt', '.docx', '.rtf', '.jpg', '.jpeg', '.png', '.csv'}
     LLAMAPARSE_EXTENSIONS = {'.pdf'}
-    
-    # Categories that should be extracted to CSV instead of Qdrant
-    CSV_CATEGORIES = {"điểm chuẩn", "học phí"}
-    
-    # Directory for structured CSV data
-    STRUCTURED_DATA_DIR = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "data", "structured"
-    )
-    
-    # Parsing method identifiers for metadata tracking
+
+    # ── CSV chunking ────────────────────────────────────────────────────
+    # Number of rows per Document chunk; header is repeated in every chunk.
+    ROWS_PER_CSV_CHUNK = 30
+
+    # ── RTF encoding fallback order ─────────────────────────────────────
+    RTF_ENCODINGS = ('utf-8', 'cp1252', 'latin1')
+
+    # ── Parse method identifiers ─────────────────────────────────────────
     PARSE_METHOD_LLAMA = "llama_parse"
-    PARSE_METHOD_LLAMA_CUSTOM = "llama_parse_custom"  # Category-specific instructions
+    PARSE_METHOD_LLAMA_CUSTOM = "llama_parse_custom"
     PARSE_METHOD_SIMPLE = "simple_directory_reader"
-    
-    # Default parsing instruction for general Vietnamese academic documents
+
+    # ── LlamaParse prompts ───────────────────────────────────────────────
     DEFAULT_PARSING_INSTRUCTION = """
         BẠN LÀ CHUYÊN GIA TRÍCH XUẤT DỮ LIỆU TỪ TÀI LIỆU HỌC THUẬT VÀ QUY CHẾ ĐẠI HỌC.
         Nhiệm vụ của bạn là chuyển đổi tài liệu thành định dạng Markdown chuẩn, sạch sẽ và giữ nguyên cấu trúc ngữ nghĩa.
@@ -115,13 +73,12 @@ class IngestionService:
         - Giữ nguyên 100% độ chính xác của: Tên riêng, Mã ngành, Số điện thoại, Email, Địa chỉ, Đường link (URL), Ngày tháng, Tỉ lệ phần trăm (%) và Số tiền.
     """
 
-    # Category-specific parsing instructions for complex tables
     ADMISSION_SCORE_INSTRUCTION = """
         BẠN LÀ HỆ THỐNG TRÍCH XUẤT DỮ LIỆU ĐIỂM CHUẨN ĐẠI HỌC TỪ PDF.
         YÊU CẦU:
         1. Trích xuất toàn bộ dữ liệu dưới dạng bảng Markdown (`| Cột 1 | Cột 2 |`).
         2. Giữ nguyên toàn bộ nội dung, không tự ý gộp cột hay xóa cột.
-        3. Tuyệt đối KHÔNG bỏ sót các dòng ghi chú, chú thích (VD: PT1, PT2, ĐT2...) nằm ở phần cuối của bảng hoặc cuối trang. Hãy giữ chúng lại dưới dạng văn bản bình thường (Text) bên dưới bảng Markdown.
+        3. Tuyệt đối KHÔNG bỏ sót các dòng ghi chú, chú thích nằm ở phần cuối của bảng hoặc cuối trang. Hãy giữ chúng lại dưới dạng văn bản bình thường (Text) bên dưới bảng Markdown.
     """
 
     TUITION_FEE_INSTRUCTION = """
@@ -135,213 +92,341 @@ class IngestionService:
     def __init__(self):
         # Initialize LlamaIndex settings (LLM + Embeddings)
         init_settings()
-        
+        settings = get_settings()
+
         # Connect to MongoDB
-        self.mongo_client = MongoClient(os.getenv("MONGO_URI"))
-        self.db = self.mongo_client["university_db"]
+        self.db = get_database("university_db")
         self.doc_collection = self.db["documents"]
-        
+
         # Connect to Qdrant
-        self.qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL"))
-        
+        self.qdrant_client = get_qdrant_client()
+
         # Collection name for vectors
-        self.collection_name = os.getenv("QDRANT_COLLECTION_NAME", "university_knowledge")
-        
+        self.collection_name = settings.database.qdrant_collection_name
+
         # LlamaParse API key for PDF processing
         self.llama_api_key = os.getenv("LLAMA_CLOUD_API_KEY")
+
+    # ── Static helpers ──────────────────────────────────────────────────
 
     @staticmethod
     def is_supported_file(filename: str) -> bool:
         ext = os.path.splitext(filename.lower())[1]
         return ext in IngestionService.SUPPORTED_EXTENSIONS
-    
+
     @staticmethod
     def get_file_extension(filename: str) -> str:
         return os.path.splitext(filename.lower())[1]
 
+    @staticmethod
+    def _compute_file_hash(file_path: str) -> str:
+        """Compute SHA-256 hash of the file for duplicate detection."""
+        sha256 = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(8192), b""):
+                sha256.update(chunk)
+        return sha256.hexdigest()
+
+
+    # ── Main entry point ────────────────────────────────────────────────
+
     def process_file(self, file_path: str, metadata: dict) -> str | None:
         filename = os.path.basename(file_path)
         ext = self.get_file_extension(filename)
-        
+
         # Validate file extension
         if ext not in self.SUPPORTED_EXTENSIONS:
-            raise ValueError(f"Unsupported file format: {ext}. Supported: {self.SUPPORTED_EXTENSIONS}")
-        
+            raise ValueError(
+                f"Unsupported file format: {ext}. Supported: {self.SUPPORTED_EXTENSIONS}"
+            )
+
+        # ── P0: Deduplication check via SHA-256 hash ────────────────────
+        file_hash = self._compute_file_hash(file_path)
+        existing_doc = self.doc_collection.find_one(
+            {"file_hash": file_hash, "status": "INDEXED"}
+        )
+        if existing_doc:
+            logger.info(
+                f"Duplicate file detected (hash={file_hash[:12]}…). "
+                f"Returning existing doc_uuid={existing_doc['doc_uuid']} — skipping re-index."
+            )
+            logger.info(
+                f"Duplicate: '{filename}' already indexed as {existing_doc['doc_uuid']}. "
+                "Skipping."
+            )
+            return existing_doc["doc_uuid"]
+
         doc_uuid = str(uuid.uuid4())
-        print(f"🔄 Processing file: {filename} (ID: {doc_uuid})...")
+        logger.info(f"Processing file: {filename} (ID: {doc_uuid})...")
 
         # --- STEP 1: SAVE METADATA TO MONGODB (PENDING) ---
         doc_record = {
             "doc_uuid": doc_uuid,
             "filename": metadata.get("original_filename", filename),
+            "file_hash": file_hash,
             "metadata": {
                 "year": metadata.get("year"),
                 "category": metadata.get("category"),
-                "description": metadata.get("description")
+                "description": metadata.get("description"),
             },
             "status": "PENDING",
-            "created_at": datetime.now()
+            "created_at": datetime.now(),
         }
         self.doc_collection.insert_one(doc_record)
 
         try:
             # --- STEP 2: LOAD DOCUMENT BASED ON FILE TYPE ---
-            # Pass category for category-specific parsing instructions (PDF only)
             category = metadata.get("category")
+
+            # All documents go through the standard Vector RAG path (Qdrant)
             documents, parsing_method = self._load_documents(file_path, ext, category)
-            
+
             if not documents:
                 raise ValueError(f"No content extracted from file: {filename}")
-            
-            print(f"📄 Loaded {len(documents)} document(s) from {ext} file (method: {parsing_method})")
-            
+
+            logger.info(
+                f"Loaded {len(documents)} document(s) from {ext} file "
+                f"(method: {parsing_method})"
+            )
+
             # Add parsing method to metadata for tracking
             metadata["parsing_method"] = parsing_method
 
-            # --- STEP 3: BRANCH — CSV for structured data, Qdrant for text ---
-            year = metadata.get("year")
-            if category and category.lower().strip() in self.CSV_CATEGORIES:
-                # Structured data path: extract tables to CSV, skip Qdrant
-                csv_path, row_count = self._extract_table_to_csv(documents, category, year)
-                
-                if csv_path is None:
-                    raise ValueError(f"Failed to extract tables from {filename} for category '{category}'")
-                
-                # Update MongoDB with CSV info
-                self.doc_collection.update_one(
-                    {"doc_uuid": doc_uuid},
-                    {"$set": {
-                        "status": "INDEXED",
-                        "storage_type": "csv",
-                        "csv_path": csv_path,
-                        "row_count": row_count,
-                        "parsing_method": parsing_method,
-                        "indexed_at": datetime.now()
-                    }}
-                )
-                
-                print(f"✅ Successfully extracted to CSV: {csv_path} ({row_count} rows)")
-            else:
-                # Text data path: chunk, embed, index to Qdrant
-                chunk_count = self._index_nodes(documents, metadata, doc_uuid)
-                
-                self.doc_collection.update_one(
-                    {"doc_uuid": doc_uuid},
-                    {"$set": {
+            # --- STEP 3: Index to Qdrant ---
+            chunk_count = self._index_nodes(documents, metadata, doc_uuid)
+
+            self.doc_collection.update_one(
+                {"doc_uuid": doc_uuid},
+                {
+                    "$set": {
                         "status": "INDEXED",
                         "storage_type": "qdrant",
                         "chunk_count": chunk_count,
                         "parsing_method": parsing_method,
-                        "indexed_at": datetime.now()
-                    }}
-                )
-                
-                print(f"✅ Successfully indexed to Qdrant: {filename} ({chunk_count} chunks)")
-            
+                        "indexed_at": datetime.now(),
+                    }
+                },
+            )
+
+            logger.info(f"Successfully indexed to Qdrant: {filename} ({chunk_count} chunks)")
             return doc_uuid
 
         except Exception as e:
             # Update MongoDB with error status
-            print(f"❌ Error: {str(e)}")
+            logger.exception(
+                "Error processing file '%s' (doc_uuid=%s)", filename, doc_uuid
+            )
             self.doc_collection.update_one(
                 {"doc_uuid": doc_uuid},
-                {"$set": {
-                    "status": "FAILED",
-                    "error": str(e)
-                }}
+                {"$set": {"status": "FAILED", "error": str(e)}},
             )
             return None
-    
-    def _load_documents(self, file_path: str, ext: str, category: str = None) -> tuple[list, str]:
+
+    # ── Document loading ────────────────────────────────────────────────
+
+    def _load_documents(
+        self, file_path: str, ext: str, category: str = None
+    ) -> tuple[list, str]:
         if ext in self.LLAMAPARSE_EXTENSIONS:
-            # --- PDF: Use LlamaParse with category-specific instructions ---
             return self._load_with_llama_parse(file_path, category)
-        elif ext == '.rtf':
-            # --- RTF: Convert to plain text using striprtf ---
+        elif ext == ".csv":
+            return self._load_csv(file_path)
+        elif ext == ".rtf":
             return self._load_rtf(file_path)
         else:
-            # --- TXT, DOCX, Images: Use SimpleDirectoryReader ---
             return self._load_with_simple_reader(file_path)
-    
+
+    def _load_csv(self, file_path: str) -> tuple[list, str]:
+        logger.info(f"Loading CSV file: {os.path.basename(file_path)}")
+
+        last_error = None
+        df = None
+        for encoding in ("utf-8-sig", "utf-8", "cp1258", "latin1"):
+            try:
+                df = pd.read_csv(
+                    file_path, encoding=encoding, sep=None, engine="python"
+                )
+                logger.info(
+                    f"CSV parsed with encoding={encoding}, rows={len(df)}"
+                )
+                break
+            except Exception as exc:
+                last_error = exc
+
+        if df is None:
+            raise ValueError(f"Failed to parse CSV file: {last_error}")
+        if df.empty:
+            raise ValueError("CSV file is empty")
+
+        # Clean empty rows/cols
+        df = df.dropna(axis=0, how="all").dropna(axis=1, how="all")
+        if df.empty:
+            raise ValueError("CSV has no usable rows after cleaning")
+
+        filename = os.path.basename(file_path)
+        total_rows = len(df)
+        chunk_size = self.ROWS_PER_CSV_CHUNK
+        num_chunks = max(1, (total_rows + chunk_size - 1) // chunk_size)
+
+        documents: List[Document] = []
+        for i in range(num_chunks):
+            batch = df.iloc[i * chunk_size : (i + 1) * chunk_size]
+            row_start = i * chunk_size + 1
+            row_end = min((i + 1) * chunk_size, total_rows)
+            table_md = self._dataframe_to_markdown(batch)
+
+            text = (
+                f"Nguồn dữ liệu CSV: {filename}\n"
+                f"[Phần {i + 1}/{num_chunks} — hàng {row_start}–{row_end}/{total_rows}]\n\n"
+                f"Bảng dữ liệu:\n{table_md}"
+            )
+            doc = Document(
+                text=text,
+                metadata={
+                    "file_name": filename,
+                    "file_type": "csv",
+                    "csv_part": i + 1,
+                    "csv_total_parts": num_chunks,
+                },
+            )
+            documents.append(doc)
+
+        logger.info(
+            f"CSV '{filename}': {total_rows} rows → "
+            f"{num_chunks} row-batched document(s) "
+            f"({chunk_size} rows/chunk, header repeated in each)"
+        )
+        return documents, self.PARSE_METHOD_SIMPLE
+
+    @staticmethod
+    def _dataframe_to_markdown(df: pd.DataFrame) -> str:
+        safe_df = df.fillna("").astype(str)
+        headers = [
+            h.strip() if isinstance(h, str) else str(h) for h in safe_df.columns
+        ]
+
+        def _escape_cell(value: str) -> str:
+            return str(value).replace("|", "\\|").replace("\n", " ").strip()
+
+        header_row = "| " + " | ".join(_escape_cell(h) for h in headers) + " |"
+        separator_row = "| " + " | ".join(["---"] * len(headers)) + " |"
+
+        data_rows = []
+        for _, row in safe_df.iterrows():
+            data_rows.append(
+                "| " + " | ".join(_escape_cell(v) for v in row.tolist()) + " |"
+            )
+
+        return "\n".join([header_row, separator_row, *data_rows])
+
     def _get_parsing_instruction(self, category: str) -> tuple[str, bool]:
         if not category:
             return self.DEFAULT_PARSING_INSTRUCTION, False
-        
-        # Normalize category for comparison (handle variations)
+
         category_lower = category.lower().strip()
-        
-        # Admission Scores: "Điểm chuẩn" or "Tuyển sinh" (contains score tables)
-        if any(keyword in category_lower for keyword in ["điểm chuẩn", "diem chuan"]):
-            logger.info(f"🎯 Using ADMISSION_SCORE_INSTRUCTION for category: {category}")
+
+        if any(
+            keyword in category_lower for keyword in ["điểm chuẩn", "diem chuan"]
+        ):
+            logger.info(f"Using ADMISSION_SCORE_INSTRUCTION for category: {category}")
             return self.ADMISSION_SCORE_INSTRUCTION, True
-        
-        # Tuition Fees: "Học phí"
+
         if any(keyword in category_lower for keyword in ["học phí", "hoc phi"]):
-            logger.info(f"💰 Using TUITION_FEE_INSTRUCTION for category: {category}")
+            logger.info(f"Using TUITION_FEE_INSTRUCTION for category: {category}")
             return self.TUITION_FEE_INSTRUCTION, True
-        
-        # Default instruction for other categories
-        logger.info(f"📄 Using DEFAULT_PARSING_INSTRUCTION for category: {category}")
+
+        logger.info(f"Using DEFAULT_PARSING_INSTRUCTION for category: {category}")
         return self.DEFAULT_PARSING_INSTRUCTION, False
-    
-    def _load_with_llama_parse(self, file_path: str, category: str = None) -> tuple[list, str]:
+
+    def _load_with_llama_parse(
+        self, file_path: str, category: str = None
+    ) -> tuple[list, str]:
         try:
-            # Get category-specific parsing instruction
             instruction, is_custom = self._get_parsing_instruction(category)
-            
-            # Create LlamaParse instance with appropriate instruction
+
             parser = LlamaParse(
                 api_key=self.llama_api_key,
                 result_type="markdown",
                 parsing_instruction=instruction,
-                verbose=True
+                verbose=True,
             )
-            
-            parse_method = self.PARSE_METHOD_LLAMA_CUSTOM if is_custom else self.PARSE_METHOD_LLAMA
-            
-            logger.info(f"📊 Using LlamaParse for PDF: {os.path.basename(file_path)} (custom={is_custom})")
-            print(f"🔄 Parsing PDF with {'CUSTOM' if is_custom else 'DEFAULT'} instruction for category: {category or 'None'}")
-            
+
+            parse_method = (
+                self.PARSE_METHOD_LLAMA_CUSTOM if is_custom else self.PARSE_METHOD_LLAMA
+            )
+
+            logger.info(
+                f"Using LlamaParse for PDF: {os.path.basename(file_path)} "
+                f"(custom={is_custom})"
+            )
+            logger.info(
+                f"Parsing PDF with {'CUSTOM' if is_custom else 'DEFAULT'} "
+                f"instruction for category: {category or 'None'}"
+            )
+
             documents = parser.load_data(file_path)
-            
+
             if documents:
-                # Add parsing strategy metadata to each document
                 for doc in documents:
-                    doc.metadata['parsing_strategy'] = parse_method
-                    doc.metadata['parsing_category'] = category or 'general'
-                
-                logger.info(f"✅ LlamaParse successfully extracted {len(documents)} document(s)")
+                    doc.metadata["parsing_strategy"] = parse_method
+                    doc.metadata["parsing_category"] = category or "general"
+
+                logger.info(
+                    f"LlamaParse successfully extracted {len(documents)} document(s)"
+                )
                 return documents, parse_method
             else:
                 raise ValueError("LlamaParse returned empty documents")
-                
+
         except Exception as e:
-            # Fallback to SimpleDirectoryReader if LlamaParse fails
-            logger.warning(f"⚠️ LlamaParse failed: {str(e)}. Fallback to standard parser.")
-            print(f"⚠️ Fallback to standard parser due to: {str(e)}")
+            logger.warning(
+                f"LlamaParse failed: {str(e)}. Fallback to standard parser."
+            )
+            logger.warning(f"Fallback to standard parser due to: {str(e)}")
             return self._load_with_simple_reader(file_path)
-    
+
     def _load_rtf(self, file_path: str) -> tuple[list, str]:
-        logger.info(f"📄 Loading RTF file: {os.path.basename(file_path)}")
-        with open(file_path, 'r', encoding='utf-8') as f:
-            rtf_content = f.read()
-        plain_text = rtf_to_text(rtf_content)
-        doc = Document(text=plain_text, metadata={"file_name": os.path.basename(file_path)})
+        logger.info(f"Loading RTF file: {os.path.basename(file_path)}")
+        last_error: Optional[Exception] = None
+
+        for enc in self.RTF_ENCODINGS:
+            try:
+                with open(file_path, "r", encoding=enc) as f:
+                    rtf_content = f.read()
+                plain_text = rtf_to_text(rtf_content)
+                logger.info(f"RTF decoded successfully with encoding={enc}")
+                break
+            except (UnicodeDecodeError, Exception) as exc:
+                last_error = exc
+                logger.debug(f"RTF decode failed with encoding={enc}: {exc}")
+        else:
+            raise ValueError(
+                f"Failed to decode RTF file '{os.path.basename(file_path)}' "
+                f"with any of {self.RTF_ENCODINGS}. Last error: {last_error}"
+            )
+
+        doc = Document(
+            text=plain_text,
+            metadata={"file_name": os.path.basename(file_path)},
+        )
         return [doc], self.PARSE_METHOD_SIMPLE
 
     def _load_with_simple_reader(self, file_path: str) -> tuple[list, str]:
-        logger.info(f"📄 Using SimpleDirectoryReader for: {os.path.basename(file_path)}")
+        logger.info(
+            f"Loading file with SimpleDirectoryReader: {os.path.basename(file_path)}"
+        )
         reader = SimpleDirectoryReader(
-            input_files=[file_path],
-            filename_as_id=True
+            input_files=[file_path], filename_as_id=True
         )
         documents = reader.load_data()
         return documents, self.PARSE_METHOD_SIMPLE
-    
+
+    # ── Indexing ────────────────────────────────────────────────────────
+
     def _index_nodes(self, documents, metadata: dict, doc_uuid: str) -> int:
         filename = metadata.get("original_filename", "unknown")
         parsing_method = metadata.get("parsing_method", self.PARSE_METHOD_SIMPLE)
-        
+
         # Add metadata to each document for filtering
         for doc in documents:
             doc.metadata["doc_uuid"] = doc_uuid
@@ -349,65 +434,89 @@ class IngestionService:
             doc.metadata["year"] = metadata.get("year")
             doc.metadata["category"] = metadata.get("category")
             doc.metadata["parsing_method"] = parsing_method
-            # Exclude technical fields from LLM context but keep filename
             doc.excluded_llm_metadata_keys = ["doc_uuid", "parsing_method"]
             doc.excluded_embed_metadata_keys = ["doc_uuid", "parsing_method"]
 
-        # Chunk documents with context-aware splitting
-        # chunk_size=2048: Đủ lớn để chứa bảng biểu phức tạp (điểm chuẩn, học phí)
-        # chunk_overlap=400: Đủ để giữ context giữa các chunk (~20%)
         splitter = SentenceSplitter(
             chunk_size=2048,
             chunk_overlap=400,
             paragraph_separator="\n\n",
         )
         nodes = splitter.get_nodes_from_documents(documents)
-        
+
+        # ── P2: Content validation ──────────────────────────────────────
+        if not nodes:
+            raise ValueError(
+                "Chunking produced zero nodes — document may be empty or unreadable."
+            )
+
+        text_lengths = [len(n.text) for n in nodes]
+        avg_len = sum(text_lengths) / len(text_lengths)
+        short_nodes = sum(1 for l in text_lengths if l < 100)
+        empty_nodes = sum(1 for l in text_lengths if l < 10)
+
+        logger.info(
+            f"Chunking summary: {len(nodes)} nodes | "
+            f"avg_len={avg_len:.0f} chars | "
+            f"min={min(text_lengths)} | max={max(text_lengths)} | "
+            f"short(<100c)={short_nodes} | empty(<10c)={empty_nodes}"
+        )
+
+        if short_nodes > len(nodes) * 0.3:
+            logger.warning(
+                f"High ratio of short chunks: {short_nodes}/{len(nodes)} "
+                f"({100 * short_nodes // len(nodes)}%). "
+                "Consider reviewing source document quality or parsing settings."
+            )
+
+        if empty_nodes > 0:
+            logger.warning(
+                f"{empty_nodes} near-empty nodes detected (<10 chars). "
+                "They will still be indexed but may add noise."
+            )
+
         # Enrich nodes with section context
         nodes = self._enrich_nodes_with_context(nodes, metadata)
-        
-        print(f"Split into {len(nodes)} chunks")
+
+        logger.info(f"Split into {len(nodes)} chunks")
 
         # Index to Qdrant
         vector_store = QdrantVectorStore(
-            client=self.qdrant_client,
-            collection_name=self.collection_name
+            client=self.qdrant_client, collection_name=self.collection_name
         )
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        
-        # This will automatically: Embed -> Index -> Upload
+
+        # Automatically: Embed → Index → Upload to Qdrant
         VectorStoreIndex(nodes, storage_context=storage_context)
-        
+
         return len(nodes)
-    
+
     def _enrich_nodes_with_context(self, nodes, metadata):
-        chapter_pattern = re.compile(r'(Chương\s+[IVXLCDM\d]+[.:]\s*[^\n]+)', re.IGNORECASE)
-        article_pattern = re.compile(r'(Điều\s+\d+[.:]\s*[^\n]+)', re.IGNORECASE)
-        section_pattern = re.compile(r'(Mục\s+\d+[.:]\s*[^\n]+)', re.IGNORECASE)
-        
+        chapter_pattern = re.compile(
+            r"(Chương\s+[IVXLCDM\d]+[.:]\s*[^\n]+)", re.IGNORECASE
+        )
+        article_pattern = re.compile(r"(Điều\s+\d+[.:]\s*[^\n]+)", re.IGNORECASE)
+        section_pattern = re.compile(r"(Mục\s+\d+[.:]\s*[^\n]+)", re.IGNORECASE)
+
         current_chapter = ""
         current_article = ""
         current_section = ""
-        
+
         for node in nodes:
             text = node.text
-            
-            # Detect chapter
+
             chapter_match = chapter_pattern.search(text)
             if chapter_match:
                 current_chapter = chapter_match.group(1).strip()
-            
-            # Detect article
+
             article_match = article_pattern.search(text)
             if article_match:
                 current_article = article_match.group(1).strip()
-            
-            # Detect section
+
             section_match = section_pattern.search(text)
             if section_match:
                 current_section = section_match.group(1).strip()
-            
-            # Build context prefix
+
             context_parts = []
             if current_chapter:
                 context_parts.append(current_chapter)
@@ -415,198 +524,18 @@ class IngestionService:
                 context_parts.append(current_section)
             if current_article:
                 context_parts.append(current_article)
-            
-            # Add context to node metadata
+
             if context_parts:
                 node.metadata["section_context"] = " > ".join(context_parts)
-            
-            # Add document info to metadata
+
             node.metadata["source_doc"] = metadata.get("original_filename", "")
             node.metadata["category"] = metadata.get("category", "")
             node.metadata["year"] = metadata.get("year", "")
-        
+
         return nodes
-    
-    def _extract_table_to_csv(self, documents, category: str, year: int) -> tuple[str | None, int]:
-        os.makedirs(self.STRUCTURED_DATA_DIR, exist_ok=True)
-        category_lower = category.lower().strip()
-        
-        if "điểm chuẩn" in category_lower:
-            return self._extract_admission_scores(documents, year)
-        elif "học phí" in category_lower:
-            return self._extract_tuition_fees(documents, year)
-        
-        return None, 0
-    
-    def _extract_admission_scores(self, documents, year: int) -> tuple[str | None, int]:
-        all_records: List[AdmissionRecord] = []
-        all_notes: set = set()
-        
-        extraction_prompt = PromptTemplate(
-            "Hãy đọc nội dung tài liệu tuyển sinh sau và trích xuất điểm chuẩn "
-            "thành cấu trúc JSON nghiêm ngặt theo schema được cung cấp.\n"
-            "- Mỗi ngành là 1 record gồm: ma_nganh, ten_nganh, to_hop_mon, và các điểm chuẩn.\n"
-            "- to_hop_mon: ghi đầy đủ danh sách tổ hợp môn xét tuyển.\n"
-            "- pt1_dt23, pt1_dt4: điểm xét tuyển thẳng (PT1) theo đối tượng.\n"
-            "- pt2: điểm Đánh giá năng lực (ĐGNL) ĐHQG TP.HCM, thang ~1200.\n"
-            "- pt3_nhom1, pt3_nhom2, pt3_nhom3: điểm xét thi tốt nghiệp THPT theo nhóm tổ hợp.\n"
-            "- Nếu ngành không xét phương thức nào đó, để null.\n"
-            "- Gom tất cả ghi chú, giải thích viết tắt (PT1, PT2, PT3, ĐT2, ĐT3, ĐT4, Nhóm 1/2/3...) vào metadata_notes.\n\n"
-            "NỘI DUNG TÀI LIỆU:\n{doc_content}"
-        )
-        
-        for i, doc in enumerate(documents):
-            content = doc.get_content()
-            if not content or not content.strip():
-                continue
-            
-            try:
-                logger.info(f"🔍 Extracting admission scores from document node {i+1}/{len(documents)}")
-                
-                # Use LLM structured prediction with Pydantic schema
-                extraction = Settings.llm.structured_predict(
-                    AdmissionTableExtraction,
-                    extraction_prompt,
-                    doc_content=content,
-                )
-                
-                if extraction.records:
-                    all_records.extend(extraction.records)
-                    logger.info(f"  ✅ Extracted {len(extraction.records)} records from node {i+1}")
-                
-                if extraction.metadata_notes:
-                    all_notes.update(extraction.metadata_notes)
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to extract from node {i+1}: {e}")
-                continue
-        
-        if not all_records:
-            logger.warning("❌ No admission records extracted from any node")
-            return None, 0
-        
-        # Flatten records to tabular format
-        flat_data = []
-        for record in all_records:
-            row = {
-                "MaNganh": record.ma_nganh,
-                "NganhHoc": record.ten_nganh,
-                "ToHopMon": record.to_hop_mon,
-            }
-            # Map fixed score fields to CSV columns
-            for col in ADMISSION_SCORE_COLUMNS:
-                row[col.upper()] = getattr(record, col, None)
-            flat_data.append(row)
-        
-        df = pd.DataFrame(flat_data)
-        
-        # Save CSV
-        csv_path = os.path.join(self.STRUCTURED_DATA_DIR, f"diem_chuan_{year}.csv")
-        df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-        logger.info(f"📊 Saved {len(df)} rows to {csv_path}")
-        print(f"📊 Saved {len(df)} rows to {csv_path}")
-        
-        # Save metadata notes
-        if all_notes:
-            notes_path = os.path.join(self.STRUCTURED_DATA_DIR, f"diem_chuan_{year}_metadata.txt")
-            with open(notes_path, 'w', encoding='utf-8') as f:
-                for note in sorted(all_notes):
-                    f.write(f"- {note}\n")
-            logger.info(f"📝 Saved {len(all_notes)} metadata notes to {notes_path}")
-            print(f"📝 Saved {len(all_notes)} notes to {notes_path}")
-        
-        return csv_path, len(df)
-    
-    def _extract_tuition_fees(self, documents, year: int) -> tuple[str | None, int]:
-        # Group by doi_tuong_ap_dung
-        groups: Dict[str, List[TuitionRecord]] = {}
-        all_notes: set = set()
-        
-        extraction_prompt = PromptTemplate(
-            "Hãy đọc nội dung tài liệu học phí sau và trích xuất thông tin học phí "
-            "thành cấu trúc JSON nghiêm ngặt theo schema được cung cấp.\n"
-            "- doi_tuong_ap_dung: Ghi rõ đối tượng khóa.\n"
-            "- Mỗi ngành/nhóm ngành là 1 record với nganh_dao_tao, hoc_phi_hk1, hoc_phi_hk2.\n"
-            "- Số tiền phải là kiểu số (bỏ dấu chấm ngàn). VD: 404000 thay vì '404.000'.\n"
-            "- Gom tất cả ghi chú về quy tắc nhân hệ số (Thạc sĩ, Tiến sĩ, VLVH) vào metadata_notes.\n\n"
-            "NỘI DUNG TÀI LIỆU:\n{doc_content}"
-        )
-        
-        for i, doc in enumerate(documents):
-            content = doc.get_content()
-            if not content or not content.strip():
-                continue
-            
-            try:
-                logger.info(f"🔍 Extracting tuition fees from document node {i+1}/{len(documents)}")
-                
-                # Use LLM structured prediction with Pydantic schema
-                extraction = Settings.llm.structured_predict(
-                    TuitionTableExtraction,
-                    extraction_prompt,
-                    doc_content=content,
-                )
-                
-                doi_tuong = extraction.doi_tuong_ap_dung or f"Bang_{i+1}"
-                
-                if extraction.records:
-                    if doi_tuong not in groups:
-                        groups[doi_tuong] = []
-                    groups[doi_tuong].extend(extraction.records)
-                    logger.info(f"  ✅ Extracted {len(extraction.records)} records for '{doi_tuong}' from node {i+1}")
-                
-                if extraction.metadata_notes:
-                    all_notes.update(extraction.metadata_notes)
-                    
-            except Exception as e:
-                logger.warning(f"⚠️ Failed to extract from node {i+1}: {e}")
-                continue
-        
-        if not groups:
-            logger.warning("❌ No tuition records extracted from any node")
-            return None, 0
-        
-        # Save each group as separate CSV
-        saved_paths = []
-        total_rows = 0
-        
-        for idx, (doi_tuong, records) in enumerate(groups.items(), start=1):
-            flat_data = [
-                {
-                    "NganhDaoTao": r.nganh_dao_tao,
-                    "HocPhi_HK1": r.hoc_phi_hk1,
-                    "HocPhi_HK2": r.hoc_phi_hk2,
-                }
-                for r in records
-            ]
-            
-            df = pd.DataFrame(flat_data)
-            csv_path = os.path.join(self.STRUCTURED_DATA_DIR, f"hoc_phi_bang_{idx}_{year}.csv")
-            df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-            saved_paths.append(csv_path)
-            total_rows += len(df)
-            logger.info(f"📊 Saved {len(df)} rows to {csv_path} (đối tượng: {doi_tuong})")
-            print(f"📊 Saved {len(df)} rows to {csv_path} (đối tượng: {doi_tuong})")
-        
-        # Save metadata notes (hệ số Thạc sĩ, Tiến sĩ, VLVH...)
-        if all_notes:
-            notes_path = os.path.join(self.STRUCTURED_DATA_DIR, f"hoc_phi_{year}_metadata.txt")
-            with open(notes_path, 'w', encoding='utf-8') as f:
-                for note in sorted(all_notes):
-                    f.write(f"- {note}\n")
-            logger.info(f"📝 Saved {len(all_notes)} metadata notes to {notes_path}")
-            print(f"📝 Saved {len(all_notes)} notes to {notes_path}")
-        
-        if saved_paths:
-            return saved_paths[0], total_rows
-        return None, 0
-    
+
     def get_all_documents(self):
         return list(self.doc_collection.find({}, {"_id": 0}))
-    
+
     def get_document_by_id(self, doc_uuid: str):
         return self.doc_collection.find_one({"doc_uuid": doc_uuid}, {"_id": 0})
-    
-    def delete_document(self, doc_uuid: str) -> bool:
-        result = self.doc_collection.delete_one({"doc_uuid": doc_uuid})
-        return result.deleted_count > 0

@@ -31,7 +31,7 @@ export const useChatStream = () => {
         cancelStream();
 
         let convId = activeConversationId;
-        let currentConversation = getActiveConversation();
+        const currentConversation = getActiveConversation();
 
         if (!convId || !currentConversation) {
             convId = createNewConversation();

@@ -1,12 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { LandingPage, ChatPage, AdminPage } from "./pages";
 
-/**
- * App Component - Router Setup
- * "/" - Landing Page (Homepage)
- * "/chat" - Chat Application
- * "/admin" - Admin Dashboard
- */
 function App() {
   return (
     <Router>

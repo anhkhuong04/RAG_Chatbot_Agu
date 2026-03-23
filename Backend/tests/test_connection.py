@@ -26,7 +26,7 @@ def check_connections():
     try:
         qdrant_url = os.getenv("QDRANT_URL")
         client = QdrantClient(url=qdrant_url)
-        collections = client.get_collections()
+        client.get_collections()
         print("Qdrant: KẾT NỐI THÀNH CÔNG!")
     except Exception as e:
         print(f"Qdrant: LỖI - {e}")

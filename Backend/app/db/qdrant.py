@@ -3,13 +3,11 @@ Qdrant connection singleton.
 
 Provides a single QdrantClient instance shared across services.
 """
-import os
 import logging
 import threading
 from qdrant_client import QdrantClient
-from dotenv import load_dotenv
+from app.core.config import get_settings
 
-load_dotenv()
 logger = logging.getLogger(__name__)
 
 _qdrant_client: QdrantClient | None = None
@@ -25,7 +23,7 @@ def get_qdrant_client() -> QdrantClient:
         if _qdrant_client is not None:
             return _qdrant_client
 
-        url = os.getenv("QDRANT_URL", "http://localhost:6333")
+        url = get_settings().database.qdrant_url
         _qdrant_client = QdrantClient(url=url)
         logger.info("✅ Qdrant client initialized")
 

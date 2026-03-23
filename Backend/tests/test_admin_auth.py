@@ -1,9 +1,6 @@
-import os
 from datetime import timedelta
-from unittest.mock import patch, MagicMock
 
 import pytest
-import pytest_asyncio
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -85,11 +82,13 @@ class TestAdminLogin:
     def setup_method(self):
         self.app = _build_test_app()
         self.client = TestClient(self.app)
+        from app.core.security import get_admin_credentials
+        self.admin_username, self.admin_password = get_admin_credentials(refresh_env=True)
 
     def test_login_success(self):
         resp = self.client.post(
             "/api/v1/admin/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": self.admin_username, "password": self.admin_password},
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -106,7 +105,7 @@ class TestAdminLogin:
     def test_login_wrong_username(self):
         resp = self.client.post(
             "/api/v1/admin/login",
-            json={"username": "hacker", "password": "admin123"},
+            json={"username": "hacker", "password": self.admin_password},
         )
         assert resp.status_code == 401
 
@@ -127,6 +126,8 @@ class TestProtectedRoutes:
     def setup_method(self):
         self.app = _build_test_app()
         self.client = TestClient(self.app)
+        from app.core.security import get_admin_credentials
+        self.admin_username, self.admin_password = get_admin_credentials(refresh_env=True)
 
     @pytest.mark.parametrize("method, path", PROTECTED_ROUTES)
     def test_no_token_returns_401(self, method, path):
@@ -143,7 +144,7 @@ class TestProtectedRoutes:
     def test_valid_token_passes_auth(self):
         login_resp = self.client.post(
             "/api/v1/admin/login",
-            json={"username": "admin", "password": "admin123"},
+            json={"username": self.admin_username, "password": self.admin_password},
         )
         token = login_resp.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}

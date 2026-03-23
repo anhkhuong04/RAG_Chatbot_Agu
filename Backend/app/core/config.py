@@ -2,7 +2,6 @@
 Application Configuration using Pydantic Settings
 Supports environment variables and .env files
 """
-import os
 from typing import Optional
 from functools import lru_cache
 from pydantic_settings import BaseSettings
@@ -68,7 +67,7 @@ class RetrievalSettings(BaseSettings):
         description="Enable LLM-based query rewriting/clarification"
     )
     enable_query_expansion: bool = Field(
-        default=False,
+        default=True,
         description="Enable multi-query expansion (generates query variants)"
     )
     enable_keyword_extraction: bool = Field(
@@ -81,7 +80,15 @@ class RetrievalSettings(BaseSettings):
         le=5,
         description="Maximum number of expanded query variants"
     )
-    
+    rerank_score_threshold: float = Field(
+        default=-5.0,
+        description="Minimum cross-encoder score to accept results (skip fallback if below)"
+    )
+    enable_hyde: bool = Field(
+        default=False,
+        description="Enable HyDE (Hypothetical Document Embeddings) for query expansion"
+    )
+
     class Config:
         env_prefix = "RAG_"
         extra = "ignore"

@@ -9,13 +9,19 @@ import {
   Search,
 } from "lucide-react";
 import type { DocumentItem } from "../../../types/admin";
-import { STATUS_CONFIG, ACADEMIC_YEARS, CATEGORIES } from "../../../types/admin";
+import {
+  STATUS_CONFIG,
+  ACADEMIC_YEARS,
+  CATEGORIES,
+} from "../../../types/admin";
 
 interface DocumentListProps {
   documents: DocumentItem[];
   isLoading: boolean;
   onDelete: (docUuid: string) => Promise<boolean>;
   onRefresh: () => void;
+  availableYears?: number[];
+  availableCategories?: string[];
 }
 
 export const DocumentList = ({
@@ -23,6 +29,8 @@ export const DocumentList = ({
   isLoading,
   onDelete,
   onRefresh,
+  availableYears = ACADEMIC_YEARS,
+  availableCategories = CATEGORIES,
 }: DocumentListProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterYear, setFilterYear] = useState<string>("");
@@ -63,9 +71,9 @@ export const DocumentList = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+    <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="py-4 border-b border-gray-100 flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-800 flex items-center gap-2">
             <FileText className="w-[18px] h-[18px] text-blue-600" />
@@ -87,7 +95,7 @@ export const DocumentList = ({
       </div>
 
       {/* Filters Bar */}
-      <div className="px-6 py-3 border-b border-gray-50 bg-gray-50/50 flex flex-wrap items-center gap-3">
+      <div className="py-4 flex flex-wrap items-center gap-4">
         {/* Search */}
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -107,7 +115,7 @@ export const DocumentList = ({
           className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
         >
           <option value="">Tất cả năm</option>
-          {ACADEMIC_YEARS.map((y: number) => (
+          {availableYears.map((y: number) => (
             <option key={y} value={String(y)}>
               {y}
             </option>
@@ -121,7 +129,7 @@ export const DocumentList = ({
           className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
         >
           <option value="">Tất cả danh mục</option>
-          {CATEGORIES.map((c: string) => (
+          {availableCategories.map((c: string) => (
             <option key={c} value={c}>
               {c}
             </option>
@@ -162,11 +170,11 @@ export const DocumentList = ({
 
       {/* Document Table */}
       {filtered.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto flex-1">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-100">
-                <th className="text-left py-3 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="text-left py-3 pr-6 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Tên file
                 </th>
                 <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">
@@ -178,7 +186,7 @@ export const DocumentList = ({
                 <th className="text-left py-3 px-4 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Ngày tạo
                 </th>
-                <th className="text-right py-3 px-6 text-xs font-medium text-gray-400 uppercase tracking-wider">
+                <th className="text-right py-3 pl-6 text-xs font-medium text-gray-400 uppercase tracking-wider">
                   Thao tác
                 </th>
               </tr>
@@ -191,21 +199,29 @@ export const DocumentList = ({
                 return (
                   <tr
                     key={doc.doc_uuid}
-                    className="hover:bg-gray-50/50 transition-colors"
+                    className="hover:bg-gray-50 transition-colors"
                   >
                     {/* Filename */}
-                    <td className="py-3.5 px-6">
+                    <td className="py-3.5 pr-6">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 bg-red-50 rounded-lg flex items-center justify-center flex-shrink-0">
                           <FileText className="w-4 h-4 text-red-500" />
                         </div>
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex flex-col gap-0.5">
                           <p
                             className="text-sm font-medium text-gray-800 truncate max-w-[220px]"
                             title={doc.filename}
                           >
                             {doc.filename}
                           </p>
+                          {doc.metadata.description && (
+                            <p
+                              className="text-xs text-gray-500 truncate max-w-[250px]"
+                              title={doc.metadata.description}
+                            >
+                              {doc.metadata.description}
+                            </p>
+                          )}
                           <p className="text-[11px] text-gray-400 font-mono">
                             {doc.doc_uuid.substring(0, 8)}...
                           </p>
@@ -257,7 +273,7 @@ export const DocumentList = ({
                     </td>
 
                     {/* Actions */}
-                    <td className="py-3.5 px-6 text-right">
+                    <td className="py-3.5 pl-6 text-right">
                       <button
                         onClick={() => handleDelete(doc)}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"

@@ -20,7 +20,8 @@ import LoginForm from "../features/auth/components/LoginForm";
  * Sidebar layout with tab-based content routing.
  */
 const AdminPage = () => {
-  const { isAuthenticated, isLoggingIn, loginError, login, logout } = useAuthStore();
+  const { isAuthenticated, isLoggingIn, loginError, login, logout } =
+    useAuthStore();
 
   if (!isAuthenticated) {
     return (
@@ -44,7 +45,11 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
     refetchDocuments,
     uploadDocument,
     resetUploadState,
+    metadataOptions,
   } = useDocuments();
+
+  const availableYears = metadataOptions?.years || [];
+  const availableCategories = metadataOptions?.categories || [];
 
   const {
     prompts,
@@ -57,10 +62,13 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
   } = usePrompts();
 
   // Compat assignments
-  const error = uploadError;
   const promptSuccess = updateSuccess;
-  const fetchDocuments = async () => { await refetchDocuments(); };
-  const fetchPrompts = async () => { await refetchPrompts(); };
+  const fetchDocuments = async () => {
+    await refetchDocuments();
+  };
+  const fetchPrompts = async () => {
+    await refetchPrompts();
+  };
 
   const handleUpload = async (formData: UploadFormData) => {
     try {
@@ -97,62 +105,73 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
     resetUpdateState();
   };
 
+  const renderKnowledgeAlerts = () => {
+    if (!uploadError && !uploadSuccess) {
+      return null;
+    }
+
+    return (
+      <div className="mb-6 space-y-3">
+        {uploadError && (
+          <div className="flex items-center gap-3 p-3.5 bg-red-50 border border-red-100 rounded-xl">
+            <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+            <p className="text-sm text-red-700 flex-1">{uploadError}</p>
+            <button
+              onClick={clearMessages}
+              className="text-red-400 hover:text-red-600 text-xs font-medium"
+            >
+              Đóng
+            </button>
+          </div>
+        )}
+
+        {uploadSuccess && (
+          <div className="flex items-center gap-3 p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl">
+            <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+            <p className="text-sm text-emerald-700 flex-1">{uploadSuccess}</p>
+            <button
+              onClick={clearMessages}
+              className="text-emerald-400 hover:text-emerald-600 text-xs font-medium"
+            >
+              Đóng
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Sidebar */}
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
       {/* Main Content */}
-      <main className="ml-64 min-h-screen">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur border-b border-gray-100 px-8 h-14 flex items-center">
-          <h1 className="text-sm font-semibold text-gray-700 flex-1">
-            {activeTab === "overview" && "Tổng quan"}
-            {activeTab === "knowledge" && "Quản lý Tri thức"}
-            {activeTab === "prompts" && "Cấu hình Prompt"}
-          </h1>
-          <button
-            onClick={logout}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-            Đăng xuất
-          </button>
+      <main className="ml-64 min-h-screen flex flex-col">
+        {/* Global Page Header */}
+        <header className="sticky top-0 z-20 bg-white border-b border-gray-100 px-8 py-4 flex items-center justify-between shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
+              <span>Admin Dashboard</span>
+              <span>/</span>
+              <span className="text-purple-600 font-medium">Quản trị hệ thống</span>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <button
+              onClick={logout}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Đăng xuất
+            </button>
+          </div>
         </header>
 
-        <div className="p-8">
-          {/* Alert Messages */}
-          {(error || uploadSuccess) && (
-            <div className="mb-6 space-y-3">
-              {error && (
-                <div className="flex items-center gap-3 p-3.5 bg-red-50 border border-red-100 rounded-xl">
-                  <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                  <p className="text-sm text-red-700 flex-1">{error}</p>
-                  <button
-                    onClick={clearMessages}
-                    className="text-red-400 hover:text-red-600 text-xs font-medium"
-                  >
-                    Đóng
-                  </button>
-                </div>
-              )}
-
-              {uploadSuccess && (
-                <div className="flex items-center gap-3 p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl">
-                  <CheckCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                  <p className="text-sm text-emerald-700 flex-1">
-                    {uploadSuccess}
-                  </p>
-                  <button
-                    onClick={clearMessages}
-                    className="text-emerald-400 hover:text-emerald-600 text-xs font-medium"
-                  >
-                    Đóng
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+        <div className="p-8 flex-1 min-h-0">
+          <section className="h-full min-h-[calc(100vh-10rem)]">
 
           {/* ===== Tab: Tổng quan ===== */}
           {activeTab === "overview" && (
@@ -162,6 +181,8 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
                 isLoading={isLoading}
                 onDelete={handleDelete}
                 onRefresh={fetchDocuments}
+                availableYears={availableYears}
+                availableCategories={availableCategories}
               />
             </div>
           )}
@@ -169,6 +190,8 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
           {/* ===== Tab: Quản lý Tri thức ===== */}
           {activeTab === "knowledge" && (
             <div className="space-y-6">
+              {renderKnowledgeAlerts()}
+
               {/* Upload + Document List grid */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                 {/* Upload Form - 1/3 */}
@@ -176,7 +199,9 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
                   <UploadForm
                     onSubmit={handleUpload}
                     isUploading={isUploading}
-                    defaultValues={getDefaultFormData()}
+                    defaultValues={getDefaultFormData(availableYears)}
+                    availableYears={availableYears}
+                    availableCategories={availableCategories}
                   />
                 </div>
 
@@ -187,6 +212,8 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
                     isLoading={isLoading}
                     onDelete={handleDelete}
                     onRefresh={fetchDocuments}
+                    availableYears={availableYears}
+                    availableCategories={availableCategories}
                   />
                 </div>
               </div>
@@ -204,6 +231,7 @@ const AdminDashboard = ({ logout }: { logout: () => void }) => {
               onRefresh={fetchPrompts}
             />
           )}
+          </section>
         </div>
       </main>
     </div>

@@ -31,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
                         isLoggingIn: false,
                     });
                     return true;
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 } catch (err: any) {
                     const message =
                         err.response?.data?.detail || "Đăng nhập thất bại. Vui lòng thử lại.";

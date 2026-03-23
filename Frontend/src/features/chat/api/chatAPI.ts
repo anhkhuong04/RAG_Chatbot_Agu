@@ -276,6 +276,7 @@ export const sendMessage = async (
 
       // Server error with response
       const status = axiosError.response.status;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const errorData = axiosError.response.data as any;
 
       if (status === 500) {

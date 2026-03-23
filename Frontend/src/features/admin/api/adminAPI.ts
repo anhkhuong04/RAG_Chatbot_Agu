@@ -53,6 +53,11 @@ export interface PromptUpdatePayload {
   is_active?: boolean;
 }
 
+export interface MetadataOptions {
+  years: number[];
+  categories: string[];
+}
+
 // ============================================
 // DOCUMENT API
 // ============================================
@@ -94,6 +99,16 @@ export const uploadDocument = async (
 export const getDocuments = async (): Promise<DocumentItem[]> => {
   const response = await adminAxios.get<DocumentItem[]>(
     `${API_BASE_URL}/api/v1/admin/documents`,
+  );
+  return response.data;
+};
+
+/**
+ * Get metadata options (years/categories) for admin forms and filters
+ */
+export const getMetadataOptions = async (): Promise<MetadataOptions> => {
+  const response = await adminAxios.get<MetadataOptions>(
+    `${API_BASE_URL}/api/v1/admin/metadata-options`,
   );
   return response.data;
 };

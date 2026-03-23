@@ -1,10 +1,5 @@
-"""
-Hybrid Retriever - Combines Dense Vector Search + Sparse BM25 Search
-Uses Reciprocal Rank Fusion (RRF) to merge results
-"""
-import asyncio
 import logging
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from collections import defaultdict
 
 from llama_index.core import VectorStoreIndex
@@ -55,13 +50,13 @@ class HybridRetriever(BaseRetriever):
                 nodes=nodes,
                 similarity_top_k=sparse_top_k,
             )
-            logger.info(f"✅ BM25 Retriever initialized with {len(nodes)} nodes")
+            logger.info(f"BM25 Retriever initialized with {len(nodes)} nodes")
         else:
             self.bm25_retriever = None
-            logger.warning("⚠️ No nodes provided for BM25. Using dense-only retrieval.")
+            logger.warning("No nodes provided for BM25. Using dense-only retrieval.")
         
         logger.info(
-            f"✅ HybridRetriever initialized (alpha={alpha}, "
+            f"HybridRetriever initialized (alpha={alpha}, "
             f"dense_k={dense_top_k}, sparse_k={sparse_top_k})"
         )
     
@@ -69,25 +64,25 @@ class HybridRetriever(BaseRetriever):
         query = query_bundle.query_str
         
         # 1. Dense Retrieval (Semantic Search)
-        logger.debug(f"🔍 Dense retrieval for: {query[:50]}...")
+        logger.debug(f"Dense retrieval for: {query[:50]}...")
         dense_nodes = self.vector_retriever.retrieve(query)
         logger.debug(f"   Found {len(dense_nodes)} dense results")
         
         # 2. Sparse Retrieval (BM25 Keyword Search)
         sparse_nodes = []
         if self.bm25_retriever:
-            logger.debug(f"🔍 Sparse (BM25) retrieval for: {query[:50]}...")
+            logger.debug(f"Sparse (BM25) retrieval for: {query[:50]}...")
             try:
                 sparse_nodes = self.bm25_retriever.retrieve(query)
                 logger.debug(f"   Found {len(sparse_nodes)} sparse results")
             except Exception as e:
-                logger.warning(f"⚠️ BM25 retrieval failed: {e}")
+                logger.warning(f"BM25 retrieval failed: {e}")
         
         # 3. Reciprocal Rank Fusion
         fused_nodes = self._reciprocal_rank_fusion(dense_nodes, sparse_nodes)
         
         logger.info(
-            f"✅ Hybrid retrieval complete: {len(dense_nodes)} dense + "
+            f"Hybrid retrieval complete: {len(dense_nodes)} dense + "
             f"{len(sparse_nodes)} sparse → {len(fused_nodes)} fused"
         )
         
@@ -133,30 +128,3 @@ class HybridRetriever(BaseRetriever):
             result.append(node)
         
         return result
-    
-    # Lock to prevent concurrent BM25 rebuilds
-    _bm25_rebuild_lock = asyncio.Lock()
-
-    async def update_bm25_index(self, nodes: List[Any]) -> None:
-        if not nodes:
-            logger.warning("⚠️ No nodes provided for BM25 update")
-            return
-
-        async with self._bm25_rebuild_lock:
-            logger.info(f"🔄 Rebuilding BM25 index with {len(nodes)} nodes (background)...")
-
-            loop = asyncio.get_event_loop()
-            sparse_top_k = self.sparse_top_k
-
-            # Heavy tokenisation + indexing happens off the event loop
-            new_retriever = await loop.run_in_executor(
-                None,
-                lambda: BM25Retriever.from_defaults(
-                    nodes=nodes,
-                    similarity_top_k=sparse_top_k,
-                ),
-            )
-
-            # Atomic swap — readers already in-flight keep the old instance
-            self.bm25_retriever = new_retriever
-            logger.info(f"✅ BM25 index updated with {len(nodes)} nodes")

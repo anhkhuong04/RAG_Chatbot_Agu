@@ -1,8 +1,6 @@
-"""
-Chat API Endpoints
-"""
 import json
 import uuid
+import logging
 from typing import Optional, List
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -10,9 +8,9 @@ from pydantic import BaseModel
 
 # Import ChatService (from refactored package)
 from app.service.chat import ChatService
-from app.service.chat.intent_classifier import IntentClassifier
 
 router = APIRouter(prefix="/chat", tags=["Chat"])
+logger = logging.getLogger(__name__)
 
 # ============================================
 # PYDANTIC MODELS
@@ -68,8 +66,12 @@ def get_chat_service() -> ChatService:
 
 async def _sse_generator(chat_service: ChatService, session_id: str, message: str):
     try:
+        logger.info(
+            f"[CHAT_STREAM] Start session={session_id} message_len={len(message)}"
+        )
         # Detect intent before streaming
         intent = await chat_service._intent_classifier.classify(message)
+        logger.info(f"[CHAT_STREAM] Intent detected: {intent} | session={session_id}")
         sources: List[str] = []
 
         # Send metadata (session_id, intent) as the first event
@@ -89,17 +91,10 @@ async def _sse_generator(chat_service: ChatService, session_id: str, message: st
                 sources_json = json.dumps(sources, ensure_ascii=False)
                 yield f"event: sources\ndata: {sources_json}\n\n"
 
-        elif intent == "QUERY_SCORES":
-            # Pandas route: sources are sent after streaming
-            sources = ["Truy xuất từ Bảng điểm chuẩn"]
-            sources_json = json.dumps(sources, ensure_ascii=False)
-            yield f"event: sources\ndata: {sources_json}\n\n"
-
-        elif intent == "QUERY_FEES":
-            # Pandas route: sources are sent after streaming
-            sources = ["Truy xuất từ Bảng học phí"]
-            sources_json = json.dumps(sources, ensure_ascii=False)
-            yield f"event: sources\ndata: {sources_json}\n\n"
+        elif intent in {"QUERY_SCORES", "QUERY_FEES"}:
+            # Sources for score/fee are emitted only when grounded retrieval succeeds
+            # inside the main processing pipeline.
+            pass
 
         elif intent == "CAREER_ADVICE":
             # Career advice: LLM base knowledge, no Qdrant retrieval
@@ -114,9 +109,11 @@ async def _sse_generator(chat_service: ChatService, session_id: str, message: st
             yield f"event: token\ndata: {escaped}\n\n"
 
         # Signal completion
+        logger.info(f"[CHAT_STREAM] Completed session={session_id}")
         yield f"event: done\ndata: [DONE]\n\n"
 
     except Exception as e:
+        logger.exception(f"[CHAT_STREAM] Failed session={session_id}: {e}")
         error_json = json.dumps({"error": str(e)}, ensure_ascii=False)
         yield f"event: error\ndata: {error_json}\n\n"
 
@@ -129,6 +126,7 @@ async def chat_stream(request: ChatRequest):
 
     chat_service = get_chat_service()
     session_id = request.get_session_id() or str(uuid.uuid4())
+    logger.info(f"[CHAT_STREAM] Incoming request session={session_id}")
 
     return StreamingResponse(
         _sse_generator(chat_service, session_id, request.message.strip()),
@@ -156,10 +154,14 @@ async def chat(request: ChatRequest):
         
         # Generate session_id if not provided
         session_id = request.get_session_id() or str(uuid.uuid4())
+        logger.info(f"[CHAT] Incoming request session={session_id}")
         
         result = await chat_service.process_message(
             session_id=session_id,
             message=request.message.strip()
+        )
+        logger.info(
+            f"[CHAT] Completed session={session_id} intent={result.get('intent', 'UNKNOWN')}"
         )
         
         return ChatResponse(
@@ -170,6 +172,7 @@ async def chat(request: ChatRequest):
         )
         
     except Exception as e:
+        logger.exception(f"[CHAT] Failed request: {e}")
         raise HTTPException(
             status_code=500,
             detail={"message": f"Error processing chat: {str(e)}"}
@@ -192,6 +195,26 @@ async def reset_conversation(session_id: str):
         raise HTTPException(
             status_code=500,
             detail=f"Error resetting conversation: {str(e)}"
+        )
+
+
+@router.delete("/{session_id}", response_model=ResetResponse)
+@router.delete("/{session_id}/", response_model=ResetResponse)
+async def delete_conversation(session_id: str):
+    try:
+        chat_service = get_chat_service()
+        success = chat_service.clear_session(session_id)
+
+        return ResetResponse(
+            success=success,
+            message="Session deleted successfully" if success else "Session not found",
+            conversation_id=session_id,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting conversation: {str(e)}"
         )
 
 

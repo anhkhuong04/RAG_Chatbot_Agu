@@ -1,14 +1,3 @@
-"""
-Response Handler module.
-
-Handles LLM response generation for different intent types:
-  - Chitchat (sync + stream)
-  - Career advice (sync + stream)
-  - RAG synthesis (sync + stream)
-  - Source extraction
-
-Extracted from ChatService chitchat/career/synthesis methods.
-"""
 import asyncio
 import logging
 import traceback
@@ -172,6 +161,61 @@ class ResponseHandler:
             error_details = traceback.format_exc()
             logger.error(f"Response synthesis error: {e}\n{error_details}")
             return "Xin lỗi, đã có lỗi khi tổng hợp câu trả lời. Vui lòng thử lại."
+
+    async def synthesize_no_context_response(
+        self,
+        query: str,
+        intent: str = "general",
+    ) -> str:
+        """
+        Generate a natural fallback response via LLM (instead of hardcoded text)
+        so behavior follows RAG_SYSTEM_PROMPT fallback instructions.
+        """
+        try:
+            if Settings.llm is None:
+                logger.error("LLM not initialized in Settings")
+                return (
+                    "Xin lỗi, hệ thống chưa thể phản hồi lúc này. "
+                    "Vui lòng liên hệ Phòng Tuyển sinh: 0794 2222 45 hoặc tuyensinh.agu.edu.vn."
+                )
+
+            intent_prompt = self._get_intent_prompt(intent)
+            prompt = f"""{RAG_SYSTEM_PROMPT}
+{intent_prompt}
+## Ngữ cảnh (Context):
+[KHÔNG CÓ DỮ LIỆU PHÙ HỢP TRONG VECTOR DB]
+
+## Câu hỏi của người dùng:
+{query}
+
+## Yêu cầu khi trả lời:
+- Trả lời tự nhiên, ngắn gọn, lịch sự.
+- Nói rõ hiện chưa có thông tin phù hợp trong dữ liệu nội bộ.
+- Hướng dẫn liên hệ Phòng Tuyển sinh với hotline 0794 2222 45 và website tuyensinh.agu.edu.vn.
+- Không bịa thông tin.
+
+## Trả lời:"""
+
+            messages = [ChatMessage(role=MessageRole.USER, content=prompt)]
+
+            if hasattr(Settings.llm, "achat"):
+                response = await Settings.llm.achat(messages)
+            else:
+                response = await asyncio.to_thread(Settings.llm.chat, messages)
+
+            if hasattr(response, "message") and hasattr(response.message, "content"):
+                return response.message.content
+            if hasattr(response, "content"):
+                return response.content
+            return str(response)
+
+        except Exception as e:
+            logger.error(f"No-context synthesis error: {e}")
+            return (
+                "Hiện tại tôi chưa tìm thấy thông tin phù hợp trong dữ liệu nội bộ. "
+                "Bạn vui lòng liên hệ Phòng Tuyển sinh qua hotline 0794 2222 45 "
+                "hoặc website tuyensinh.agu.edu.vn để được hỗ trợ chính xác hơn."
+            )
 
     async def synthesize_response_stream(
         self,

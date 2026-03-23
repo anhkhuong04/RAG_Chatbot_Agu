@@ -1,18 +1,6 @@
-"""
-Chat History Manager.
-
-Handles all MongoDB operations for chat session history:
-  - Load recent messages
-  - Save messages
-  - Get/clear/list sessions
-
-Extracted from ChatService._load_chat_history, _save_to_history,
-get_session_history, clear_session, get_all_sessions.
-"""
 import logging
 from datetime import datetime
 from typing import Optional, List, Dict
-
 from pymongo.collection import Collection
 from llama_index.core.llms import ChatMessage, MessageRole
 

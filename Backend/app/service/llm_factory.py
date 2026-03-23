@@ -1,4 +1,4 @@
-import os
+import logging
 from dotenv import load_dotenv
 from llama_index.core import Settings
 from llama_index.llms.openai import OpenAI
@@ -7,6 +7,7 @@ from app.core.config import get_settings
 
 # Load environment variables
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 def init_settings():
     app_settings = get_settings()
@@ -15,7 +16,7 @@ def init_settings():
     # Configure LLM (for chat/generation)
     Settings.llm = OpenAI(
         model=llm_cfg.llm_model,
-        api_key=llm_cfg.openai_api_key or os.getenv("OPENAI_API_KEY"),
+        api_key=llm_cfg.openai_api_key,
         temperature=llm_cfg.llm_temperature
     )
     
@@ -23,14 +24,16 @@ def init_settings():
     Settings.embed_model = OpenAIEmbedding(
         model=llm_cfg.embedding_model,
         dimensions=llm_cfg.embedding_dimension,
-        api_key=llm_cfg.openai_api_key or os.getenv("OPENAI_API_KEY")
+        api_key=llm_cfg.openai_api_key
     )
     
     # Configure chunking defaults
     Settings.chunk_size = 1024
     Settings.chunk_overlap = 200
     
-    print(f"✅ LlamaIndex Settings initialized ({llm_cfg.llm_model} + {llm_cfg.embedding_model}, dim={llm_cfg.embedding_dimension})")
+    logger.info(
+        f"LlamaIndex Settings initialized ({llm_cfg.llm_model} + {llm_cfg.embedding_model}, dim={llm_cfg.embedding_dimension})"
+    )
 
 
 def get_llm():

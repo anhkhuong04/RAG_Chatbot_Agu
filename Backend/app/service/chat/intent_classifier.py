@@ -2,7 +2,6 @@ import re
 import logging
 from difflib import SequenceMatcher
 from typing import Dict, List, Optional
-
 from llama_index.core import Settings
 from llama_index.core.llms import ChatMessage, MessageRole
 
@@ -35,39 +34,6 @@ Quy tắc:
 1. Chỉ trả lời DUY NHẤT 1 từ: QUERY_SCORES hoặc QUERY_FEES hoặc CAREER_ADVICE hoặc CHITCHAT hoặc QUERY_DOCS
 2. Không giải thích, không thêm bất kỳ ký tự nào khác
 3. Khi câu hỏi mơ hồ, ưu tiên QUERY_DOCS"""
-
-# --------------------------------------------------------------------------
-# Regex patterns (migrated from QueryRewriter._detect_intent)
-# --------------------------------------------------------------------------
-
-_INTENT_PATTERNS: Dict[str, re.Pattern] = {
-    "QUERY_SCORES": re.compile(
-        r"\b(điểm\s*chuẩn|diem\s*chuan|điểm\s*trúng\s*tuyển|diem\s*trung\s*tuyen"
-        r"|điểm\s*đỗ|diem\s*do|điểm\s*đậu|diem\s*dau|điểm\s*xét\s*tuyển|diem\s*xet\s*tuyen"
-        r"|điểm\s*đầu\s*vào|diem\s*dau\s*vao)\b",
-        re.IGNORECASE,
-    ),
-    "QUERY_FEES": re.compile(
-        r"\b(học\s*phí|hoc\s*phi|chi\s*phí|chi\s*phi|tiền\s*học|tien\s*hoc"
-        r"|lệ\s*phí|le\s*phi"
-        r"|tín\s*chỉ|tin\s*chi)\b",
-        re.IGNORECASE,
-    ),
-    "CAREER_ADVICE": re.compile(
-        r"\b(cơ\s*hội\s*việc\s*làm|hướng\s*nghiệp|ra\s*trường|làm\s*nghề\s*gì"
-        r"|việc\s*làm|nghề\s*nghiệp|triển\s*vọng|ra\s*làm\s*gì)\b",
-        re.IGNORECASE,
-    ),
-    "QUERY_DOCS": re.compile(
-        r"\b(tuyển\s*sinh|tuyen\s*sinh|xét\s*tuyển|xet\s*tuyen|đăng\s*ký|dang\s*ky"
-        r"|nộp\s*hồ\s*sơ|nop\s*ho\s*so|nguyện\s*vọng|nguyen\s*vong|chỉ\s*tiêu|chi\s*tieu"
-        r"|ngành|nganh|chuyên\s*ngành|chuyen\s*nganh|chương\s*trình|chuong\s*trinh"
-        r"|đào\s*tạo|dao\s*tao|mã\s*ngành|ma\s*nganh"
-        r"|quy\s*chế|quy\s*che|quy\s*định|quy\s*dinh|điều\s*kiện|dieu\s*kien"
-        r"|học\s*bổng|hoc\s*bong|miễn\s*giảm|mien\s*giam)\b",
-        re.IGNORECASE,
-    ),
-}
 
 # Canonical keyword list per intent — used for fuzzy fallback
 _FUZZY_KEYWORDS: Dict[str, List[str]] = {
@@ -117,18 +83,18 @@ class IntentClassifier:
     async def classify(self, message: str) -> str:
         keyword_result = self._classify_by_keywords(message)
         if keyword_result is not None:
-            logger.debug(f"Intent (keyword): {keyword_result}")
+            logger.info(f"🎯 [IntentClassifier] Phân loại bằng Keywords: {keyword_result}")
             return keyword_result
 
         # Step 2: Regex + fuzzy matching (instant)
         regex_result = self._classify_by_regex_fuzzy(message)
         if regex_result is not None:
-            logger.debug(f"Intent (regex/fuzzy): {regex_result}")
+            logger.info(f"🎯 [IntentClassifier] Phân loại bằng Fuzzy/Regex: {regex_result}")
             return regex_result
 
         # Step 3: LLM fallback (async)
         llm_result = await self._classify_by_llm(message)
-        logger.info(f"Intent (LLM): {llm_result} for '{message[:50]}...'")
+        logger.info(f"🎯 [IntentClassifier] Phân loại bởi LLM: {llm_result} cho '{message[:50]}...'")
         return llm_result
 
     # ------------------------------------------------------------------
@@ -141,7 +107,21 @@ class IntentClassifier:
         words = message_lower.split()
         word_count = len(words)
 
-        # Priority 1: Score-specific indicators
+        # Priority 1: Aggressive Score-specific indicators intercept
+        # Prevents queries about scores from falling into standard RAG
+        if (
+            ("điểm" in message_lower or "diem" in message_lower)
+            and any(
+                sub in message_lower
+                for sub in [
+                    "chuẩn", "trúng", "đậu", "đỗ", "xét", "đầu vào", "thi", "đánh giá", "năng lực",
+                    "chuan", "trung", "dau", "xet", "dau vao", "danh gia", "nang luc",
+                    "cntt", "ktpm", "bao nhiêu", "bao nhieu",
+                ]
+            )
+        ):
+            return "QUERY_SCORES"
+            
         for indicator in SCORE_INDICATORS:
             if indicator in message_lower:
                 return "QUERY_SCORES"
@@ -183,14 +163,6 @@ class IntentClassifier:
     @staticmethod
     def _classify_by_regex_fuzzy(message: str) -> Optional[str]:
         message_lower = message.lower()
-
-        # 2a. Regex match (handles exact, no-diacritics, extra spaces)
-        for intent, pattern in _INTENT_PATTERNS.items():
-            if pattern.search(message):
-                # Mirror keyword step: "dự kiến" → force QUERY_DOCS for fee queries
-                if intent == "QUERY_FEES" and "dự kiến" in message_lower:
-                    return "QUERY_DOCS"
-                return intent
 
         # 2b. Fuzzy matching for light typos
         best_intent = None

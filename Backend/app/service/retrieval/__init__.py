@@ -9,13 +9,11 @@ Advanced Retrieval Module for RAG System
 from app.service.retrieval.hybrid_retriever import HybridRetriever
 from app.service.retrieval.reranker import CrossEncoderReranker
 from app.service.retrieval.metadata_filter import MetadataFilterService
-from app.service.retrieval.query_rewriter import QueryRewriter, HyDEQueryExpander, RewrittenQuery
+from app.service.retrieval.query_rewriter import QueryRewriter
 
 __all__ = [
     "HybridRetriever",
-    "CrossEncoderReranker", 
+    "CrossEncoderReranker",
     "MetadataFilterService",
     "QueryRewriter",
-    "HyDEQueryExpander",
-    "RewrittenQuery",
 ]

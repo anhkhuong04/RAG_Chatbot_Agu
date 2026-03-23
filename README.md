@@ -1,171 +1,146 @@
-# 🎓 AI-Powered Admission Counseling Chatbot (Advanced RAG)
+# AI-Powered Admission Counseling Chatbot (Advanced RAG)
 
-This project implements an **AI-powered chatbot for university admission counseling** at **An Giang University (AGU)**, leveraging **Advanced Retrieval-Augmented Generation (Advanced RAG)** to provide accurate, consistent, and context-aware answers to prospective students.
+Hệ thống chatbot tư vấn tuyển sinh cho Trường Đại học An Giang, sử dụng Advanced RAG để trả lời có ngữ cảnh, giảm hallucination và hỗ trợ truy vấn cả dữ liệu văn bản lẫn dữ liệu bảng.
 
-The chatbot is designed to support:
+## Mục tiêu chính
 
-- 🤖 Automated responses to admission-related FAQs
-- 📊 Intelligent tabular data extraction for admission scores and tuition fees using Pandas Query Engines
-- 🛡️ Reduced hallucination through retrieval-based grounding and strict system prompts
+- Tư vấn tuyển sinh tự động theo ngữ cảnh.
+- Truy vấn dữ liệu điểm chuẩn/học phí từ nguồn cấu trúc.
+- Quản trị tri thức và prompt qua trang Admin.
+- Hỗ trợ streaming phản hồi theo thời gian thực.
 
----
+## Kiến trúc tổng quan
 
-## 🚀 Demo
+### Backend (FastAPI)
 
-> Demo link will be added after deployment.
+- `app/api`: Endpoint REST/SSE (chat, admin).
+- `app/service`: Nghiệp vụ chat, retrieval, ingestion, prompt.
+- `app/service/retrieval`: Hybrid retrieval, query rewrite/expansion, reranking, metadata filter.
+- `app/db`: Kết nối singleton MongoDB và Qdrant.
+- `app/core`: Cấu hình hệ thống, bảo mật.
 
----
+### Frontend (React + Vite + TypeScript)
 
-## 🧠 System Architecture Overview
+- Feature-Sliced Design cho chat/admin/auth.
+- React Query để quản lý gọi API.
+- Router phía client, Nginx fallback `index.html` cho SPA.
 
-The system follows a strict separation of concerns, ensuring high maintainability and scalability:
-
-### Backend: Clean Architecture
-
-The backend is structured into layers to decouple the core business logic (RAG orchestration) from external frameworks and delivery mechanisms (FastAPI, Qdrant, MongoDB).
-
-- `app/api/`: FastAPI route handlers and request/response models.
-- `app/service/`: Core business logic, intent configuration, and Advanced RAG pipelines.
-- `app/db/`: Database connection singletons (MongoDB, Qdrant).
-- `app/core/`: Application settings, security, and environment configurations.
-- `data/`: Ingestion pipelines (LlamaParse) and structured/unstructured datasets.
-
-### Frontend: Feature-Sliced Design (FSD)
-
-The React frontend isolates code strictly by feature domains, eliminating monolithic hooks and components.
-
-- `features/chat/`: Chatbot UI, Zustand global state for message management, and SSE streaming hooks.
-- `features/admin/`: Admin knowledge base dashboard, React Query hooks for document and prompt API mutations.
-- `features/auth/`: Authentication stores and forms.
-- `lib/`: Centralized API Axios instances and Query clients.
-
----
-
-## 🛠️ Tech Stack
+## Công nghệ sử dụng
 
 ### Backend
 
-- **Framework:** FastAPI (Python 3.12)
-- **RAG Orchestrator:** LlamaIndex
-- **Vector Database:** Qdrant
-- **Conversation State DB:** MongoDB
-- **LLM / Embeddings:** OpenAI
-- **Data Parsing:** LlamaParse (for complex PDF & tables)
+- FastAPI, Uvicorn
+- LlamaIndex
+- Qdrant
+- MongoDB
+- OpenAI Embeddings/LLM
+- Sentence-Transformers (reranker)
 
 ### Frontend
 
-- **Framework:** React + Vite + TypeScript
-- **Styling:** Tailwind CSS
-- **Data Fetching:** TanStack React Query
-- **Routing:** React Router DOM
+- React 19 + Vite
+- TypeScript
+- Tailwind CSS
+- TanStack React Query
 
----
+## Chạy nhanh với Docker (khuyến nghị)
 
-## � Project Structure
+### 1. Chuẩn bị biến môi trường
 
-```text
-RAG_Chatbot_Agu/
-├── Backend/
-│   ├── app/                # Clean Architecture Logic
-│   │   ├── api/            # FastAPI Endpoints
-│   │   ├── core/           # Security & Configs
-│   │   ├── db/             # Qdrant & Mongo Clients
-│   │   └── service/        # RAG Engines & Chat Logic
-│   ├── data/               # Ingested datasets (PDFs, CSVs)
-│   ├── tests/              # Pytest verification
-│   └── main.py             # Uvicorn entry point
-└── Frontend/
-    ├── src/
-    │   ├── features/       # Feature-Sliced Design
-    │   │   ├── admin/      # Admin Panel (KB, Prompts)
-    │   │   ├── auth/       # Login logic
-    │   │   └── chat/       # Chatbot Interface & SSE
-    │   ├── lib/            # Axios & React Query clients
-    │   ├── pages/          # Top-level Page components
-    │   └── main.tsx        # React entry point
-    ├── vite.config.ts
-    └── package.json
-```
-
----
-
-## ⚙️ Local Setup Instructions
-
-This repository supports 2 ways to run:
-
-- **Option A (recommended): Full Docker stack** -> closest to the current local state, includes preloaded MongoDB + Qdrant data.
-- **Option B: Development mode** -> run database with Docker, run Backend/Frontend locally for coding.
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/anhkhuong04/RAG_Chatbot_Agu.git
-cd RAG_Chatbot_Agu
-```
-
-### 2. Prepare required environment variables (Backend)
-
-Create `Backend/.env` manually (there is no `.env.example` in this repo):
+Tạo file `Backend/.env`:
 
 ```env
-# Required for chat generation and embeddings
 OPENAI_API_KEY=your_openai_api_key
-
-# Optional but recommended for stable admin sessions
 JWT_SECRET_KEY=your_strong_secret_key
 
-# Optional (defaults shown)
 ADMIN_USERNAME=Admin
 ADMIN_PASSWORD=123456
+
+# Các biến dưới đây thường được docker-compose override trong môi trường container
 MONGO_URI=mongodb://admin:admin123@localhost:27018/?authSource=admin
 QDRANT_URL=http://localhost:6333
+LOG_LEVEL=INFO
 ```
 
-### 3A. Option A - Run full stack with Docker (recommended)
+### 2. Khởi động hệ thống
 
 ```bash
 docker compose up -d --build
 ```
 
-Services:
+### 3. Endpoint sau khi chạy
 
 - Frontend: `http://localhost`
 - Backend API: `http://localhost:8000`
-- MongoDB: `localhost:27018`
-- Qdrant: `localhost:6333`
+- Health backend: `http://localhost:8000/health`
+- Swagger: `http://localhost:8000/docs`
 
-Why this is closest to current local behavior:
-
-- `docker-compose.yml` maps `./mongo_data` -> `/data/db`
-- `docker-compose.yml` maps `./qdrant_data` -> `/qdrant/storage`
-- cloned users can use preloaded data immediately without re-ingestion.
-
-### 4. Quick verification checklist
-
-- Open `http://localhost:8000/health` -> should return healthy status.
-- Open Frontend (`http://localhost` for Docker mode, `http://localhost:5173` for dev mode).
-- Ask a sample admissions question in chat.
-- Login Admin with configured credentials (`Admin`/`123456` if unchanged).
-
-### 5. Stop the system
-
-If running Docker mode:
+### 4. Dừng hệ thống
 
 ```bash
 docker compose down
 ```
 
-If running dev mode:
+## Chạy ở chế độ phát triển (local dev)
 
-- press `Ctrl + C` in Backend and Frontend terminals.
-- stop DB containers when done:
+### 1. Khởi động database bằng Docker
 
 ```bash
-docker compose stop mongo qdrant
+docker compose up -d mongo qdrant
 ```
 
----
+### 2. Chạy backend
 
-## �️ License
+```bash
+cd Backend
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
 
-This project is proprietary and built for An Giang University admission counseling purposes.
+### 3. Chạy frontend
+
+```bash
+cd Frontend
+npm install
+npm run dev
+```
+
+## Kiểm thử nhanh
+
+- Backend health: truy cập `http://localhost:8000/health`.
+- Gửi câu hỏi trên giao diện chat.
+- Đăng nhập admin với tài khoản trong `Backend/.env`.
+
+## Cấu trúc thư mục chính
+
+```text
+Backend/
+    app/
+        api/
+        core/
+        db/
+        service/
+    tests/
+
+Frontend/
+    src/
+        features/
+        components/
+        pages/
+```
+
+## Lưu ý vận hành
+
+- Dữ liệu local được mount từ `mongo_data/` và `qdrant_data/` khi chạy Docker.
+- Không xóa hai thư mục dữ liệu này nếu muốn giữ trạng thái index/chat.
+- Frontend qua Nginx đã cấu hình proxy `/api` sang backend container.
+
+## Tài liệu bổ sung
+
+- Hướng dẫn sử dụng chi tiết: xem `HDSD.md`.
+
+## License
+
+Dự án phục vụ mục đích nội bộ cho bài toán tư vấn tuyển sinh.

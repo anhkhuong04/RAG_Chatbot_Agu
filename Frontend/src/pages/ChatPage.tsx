@@ -10,11 +10,7 @@ import "../styles/chat.css";
  * Route: "/chat"
  */
 const ChatPage: React.FC = () => {
-  const {
-    loading,
-    error,
-    handleSendMessage,
-  } = useChatStream();
+  const { loading, error, handleSendMessage } = useChatStream();
 
   const {
     conversations,
@@ -34,24 +30,20 @@ const ChatPage: React.FC = () => {
   // Các gợi ý câu hỏi
   const suggestions = [
     {
-      icon: "💡",
       text: "Giới thiệu về Khoa Công nghệ thông tin",
       message: "Giới thiệu về Khoa Công nghệ thông tin",
     },
     {
-      icon: "📚",
       text: "Học bổng dành cho tân sinh viên?",
       message: "Học bổng dành cho tân sinh viên?",
     },
     {
-      icon: "📊",
       text: "Điểm chuẩn ngành CNTT, KTPM năm trước?",
       message: "Điểm chuẩn các ngành CNTT, KTPM năm trước là bao nhiêu?",
     },
     {
-      icon: "💰",
-      text: "Học phí dự kiến bao nhiêu cho 1 năm học?",
-      message: "Học phí dự kiến bao nhiêu cho 1 năm học ngành CNTT?",
+      text: "Học phí dự kiến các ngành khoa CNTT là bao nhiêu?",
+      message: "Học phí dự kiến các ngành khoa CNTT là bao nhiêu?",
     },
   ];
 
@@ -79,10 +71,11 @@ const ChatPage: React.FC = () => {
 
         {/* Welcome Screen - Hiển thị khi chưa có tin nhắn */}
         <div
-          className={`absolute inset-0 flex flex-col items-center justify-center px-4 bg-white transition-all duration-500 ease-out ${hasMessages
+          className={`absolute inset-0 flex flex-col items-center justify-center px-4 bg-white transition-all duration-500 ease-out ${
+            hasMessages
               ? "opacity-0 pointer-events-none scale-95"
               : "opacity-100 pointer-events-auto scale-100"
-            }`}
+          }`}
         >
           <div className="text-center mb-8 welcome-content">
             <div className="empty-state-icon text-7xl mb-6">🎓</div>
@@ -116,7 +109,6 @@ const ChatPage: React.FC = () => {
                   onClick={() => handleSendMessage(suggestion.message)}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">{suggestion.icon}</span>
                     <span className="font-medium">{suggestion.text}</span>
                   </div>
                 </button>
@@ -127,10 +119,11 @@ const ChatPage: React.FC = () => {
 
         {/* Chat Window - Hiển thị khi có tin nhắn */}
         <div
-          className={`flex-1 flex flex-col overflow-hidden transition-all duration-500 ease-out ${hasMessages
+          className={`flex-1 flex flex-col overflow-hidden transition-all duration-500 ease-out ${
+            hasMessages
               ? "opacity-100 translate-y-0"
               : "opacity-0 translate-y-4 pointer-events-none"
-            }`}
+          }`}
         >
           <ChatWindow
             messages={activeConversation?.messages || []}

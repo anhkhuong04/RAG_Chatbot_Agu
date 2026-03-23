@@ -34,7 +34,7 @@ export interface UploadFormData {
 // Constants for Dropdowns
 // ============================================
 
-export const ACADEMIC_YEARS = [2025, 2026];
+export const ACADEMIC_YEARS = [2024, 2025, 2026];
 
 export const CATEGORIES = ["Tuyển sinh", "Học phí", "Điểm chuẩn", "Khác"];
 

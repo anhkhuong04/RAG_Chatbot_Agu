@@ -1,83 +1,106 @@
-# Hướng Dẫn Cài Đặt và Sử Dụng Dự Án RAG Chatbot
+# Huong Dan Cho Nguoi Nhan File Zip Chay Giong May Local
 
-Tài liệu này giúp người dùng clone dự án từ GitHub và chạy được đầy đủ chức năng giống môi trường local
+## Nguoi nhan can lam gi de chay duoc nhu local
 
-## 1. Yêu cầu hệ thống
+### 4.1. Yeu cau tren may nguoi nhan
 
-- [Git](https://git-scm.com/downloads)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Python 3.11+](https://www.python.org/downloads/)
-- [Node.js 20+](https://nodejs.org/)
+- Docker Desktop da cai va dang chay
+- Con trong o dia (goi co the lon neu giu `mongo_data` va `qdrant_data`)
 
-## 2. Clone dự án
+### 4.2. Nhan va giai nen
 
-```bash
-git clone <repo-url>
-cd RAG_Chatbot_Agu
-```
+Nguoi nhan giai nen vao duong dan khong dau, vi du:
 
-## 3. Thiết lập biến môi trường
+`D:\RAG Chatbot`
 
-### Backend
+### 4.3. Sua key bat buoc
 
-Tạo file `Backend/.env` (repo hiện tại chưa có `.env.example`) với nội dung tối thiểu:
+- Mo `Backend/.env`
+- Dien `OPENAI_API_KEY` cua may ho (neu key khac)
+- Giu nguyen hoac doi `JWT_SECRET_KEY`
+- Neu can, doi `ADMIN_USERNAME` va `ADMIN_PASSWORD`
 
-```env
-# Bắt buộc để chatbot trả lời
-OPENAI_API_KEY=your_openai_api_key
+### 4.4. Chay he thong
 
-# Khuyên dùng để token admin không bị mất sau mỗi lần restart
-JWT_SECRET_KEY=your_strong_secret_key
-
-# Tùy chọn (mặc định nếu không set)
-ADMIN_USERNAME=Admin
-ADMIN_PASSWORD=123456
-MONGO_URI=mongodb://admin:admin123@localhost:27018/?authSource=admin
-QDRANT_URL=http://localhost:6333
-```
-
-### Frontend (chỉ cần khi chạy dev mode)
-
-Tạo file `Frontend/.env`:
-
-```env
-VITE_API_URL=http://localhost:8000
-```
-
-## 4. Cách chạy dự án: Chạy thông qua Docker
-
-Đây là cách sát nhất với local hiện tại, vì `docker-compose.yml` đã mount dữ liệu có sẵn từ `mongo_data/` và `qdrant_data/`.
+Mo terminal tai thu muc goc du an va chay:
 
 ```bash
 docker compose up -d --build
 ```
 
-Sau khi chạy:
+### 4.5. Truy cap sau khi chay
 
-- Frontend: http://localhost
-- Backend API: http://localhost:8000
-- MongoDB: localhost:27018
-- Qdrant: localhost:6333
+- Frontend: `http://localhost`
+- Backend API: `http://localhost:8000`
+- Health check: `http://localhost:8000/health`
+- MongoDB host port: `localhost:27018`
+- Qdrant: `http://localhost:6333`
 
-## 5. Kiểm tra nhanh sau khi chạy
-
-- Mở `http://localhost:8000/health`, kết quả phải là trạng thái healthy.
-- Mở giao diện chat (Docker mode: `http://localhost`, Dev mode: `http://localhost:5173`).
-- Gửi 1 câu hỏi tuyển sinh để kiểm tra luồng RAG.
-- Đăng nhập admin bằng tài khoản mặc định `Admin / 123456` nếu bạn chưa đổi trong `.env`.
-
-## 6. Cách dừng hệ thống
-
-Nếu chạy full Docker:
+### 4.6. Dung he thong khi khong su dung
 
 ```bash
 docker compose down
 ```
 
-## 7. Lưu ý quan trọng về dữ liệu nạp sẵn
+## 5. Neu khong can du lieu cu
 
-- Dữ liệu được lấy từ 2 thư mục trong repo:
-  - `mongo_data/`
-  - `qdrant_data/`
-- Không xóa hai thư mục này nếu muốn giữ trạng thái dữ liệu giống local.
-- Tránh dùng lệnh xóa volume dữ liệu nếu bạn không muốn reset data.
+Ban co 2 lua chon:
+
+- Xoa `mongo_data/` va `qdrant_data/` truoc khi nen de goi nhe hon.
+- Hoac giu nguyen thu muc nhung xoa tren may dich neu muon reset du lieu.
+
+Khi do he thong se tao du lieu moi sau khi chay lai, nhung ket qua retrieval co the khac so voi may local cu.
+
+## 6. Kiem tra nguoi nhan da chay dung chua
+
+1. Truy cap `http://localhost:8000/health` phai tra ve trang thai hoat dong.
+2. Mo `http://localhost`, gui 1 cau hoi de test chat.
+3. Dang nhap admin bang tai khoan trong `Backend/.env`.
+4. Neu nguoi gui da gui kem `mongo_data` va `qdrant_data`, ket qua phai gan giong may local.
+
+## 7. Loi thuong gap khi nguoi nhan mo tren may ho
+
+### 7.1. Backend bao loi thieu API key
+
+- Kiem tra `Backend/.env` da co `OPENAI_API_KEY` chua.
+- Chay lai: `docker compose up -d --build`.
+
+### 7.2. Khong ket noi duoc Mongo/Qdrant
+
+- Kiem tra container co dang chay: `docker compose ps`.
+- Neu loi data cu, thu `docker compose down` roi `docker compose up -d --build`.
+
+### 7.3. Frontend khong goi duoc backend
+
+- Kiem tra backend da len tai `http://localhost:8000/health`.
+- Kiem tra container `uni_frontend` va `uni_backend` co `Up`.
+
+### 7.4. Bao loi port da duoc su dung
+
+- Neu may nguoi nhan dang dung cong 80/8000/27018/6333 cho app khac, can tat app xung dot hoac doi port trong `docker-compose.yml`.
+
+## 8. Mau tin nhan gui kem file zip (de copy dung nhanh)
+
+Nguoi gui co the gui kem doan nay cho nguoi nhan:
+
+```text
+Ban giai nen file vao D:\RAG Chatbot, mo Docker Desktop truoc.
+Sau do mo terminal tai thu muc goc du an va chay:
+docker compose up -d --build
+
+Cho 1-2 phut roi mo:
+- Frontend: http://localhost
+- Backend health: http://localhost:8000/health
+
+Neu can, sua OPENAI_API_KEY trong Backend/.env truoc khi chay.
+Khi dung he thong thi chay:
+docker compose down
+```
+
+## 9. Checklist ngan truoc khi gui file nen
+
+- Co `docker-compose.yml`.
+- Co `Backend/.env` (da dien key can thiet).
+- Co/khong co `mongo_data`, `qdrant_data` theo nhu cau giu du lieu.
+- Khong dong goi `.venv`, `node_modules`, `__pycache__`.
+- Da test local bang `docker compose up -d --build` thanh cong.

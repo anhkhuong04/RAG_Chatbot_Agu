@@ -1,13 +1,51 @@
-"""
-FastAPI Application Entry Point
-RAG Chatbot Backend - University Knowledge Base
-"""
+import os
+import logging
+from logging.config import dictConfig
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+
+def setup_logging() -> None:
+    """Configure application logging so app.* loggers are visible under uvicorn."""
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    log_format = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+
+    dictConfig(
+        {
+            "version": 1,
+            "disable_existing_loggers": False,
+            "formatters": {
+                "standard": {
+                    "format": log_format,
+                }
+            },
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "formatter": "standard",
+                }
+            },
+            "root": {
+                "handlers": ["console"],
+                "level": log_level,
+            },
+            "loggers": {
+                "app": {
+                    "handlers": ["console"],
+                    "level": log_level,
+                    "propagate": False,
+                }
+            },
+        }
+    )
+
+
+setup_logging()
+logger = logging.getLogger("app.main")
 
 # Import API routers
 from app.api.v1 import api_router
@@ -32,6 +70,11 @@ app.add_middleware(
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+async def startup_log() -> None:
+    logger.info("Backend started successfully")
 
 
 @app.get("/")

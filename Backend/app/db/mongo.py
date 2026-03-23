@@ -4,15 +4,13 @@ MongoDB connection singleton.
 Provides a single MongoClient instance shared across services,
 avoiding repeated MongoClient(...) instantiation.
 """
-import os
 import logging
 import threading
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection
-from dotenv import load_dotenv
+from app.core.config import get_settings
 
-load_dotenv()
 logger = logging.getLogger(__name__)
 
 _mongo_client: MongoClient | None = None
@@ -28,7 +26,7 @@ def get_mongo_client() -> MongoClient:
         if _mongo_client is not None:
             return _mongo_client
 
-        uri = os.getenv("MONGO_URI", "mongodb://admin:admin123@localhost:27018/?authSource=admin")
+        uri = get_settings().database.mongo_uri
         _mongo_client = MongoClient(uri)
         logger.info("✅ MongoDB client initialized")
 
@@ -41,3 +39,5 @@ def get_database(db_name: str = "university_db") -> Database:
 
 def get_chat_sessions_collection() -> Collection:
     return get_database()["chat_sessions"]
+
+

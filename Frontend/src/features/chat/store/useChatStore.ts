@@ -128,15 +128,18 @@ export const useChatStore = create<ChatState>()(
                 activeConversationId: state.activeConversationId,
             }),
             // Deserialize dates correctly and strip transient state
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             merge: (persistedState: any, currentState) => {
                 if (!persistedState || !persistedState.conversations) return currentState;
 
                 return {
                     ...currentState,
                     activeConversationId: persistedState.activeConversationId,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                     conversations: persistedState.conversations.map((conv: any) => ({
                         ...conv,
                         timestamp: new Date(conv.timestamp),
+                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                         messages: conv.messages.map((msg: any) => ({
                             ...msg,
                             timestamp: new Date(msg.timestamp),

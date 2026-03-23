@@ -1,11 +1,7 @@
 import React from "react";
 import { MapPin, Phone, Mail, Globe, Facebook } from "lucide-react";
 
-/**
- * Contact Section - Thông tin liên hệ với bản đồ
- * - Bản đồ Google Maps bên trái
- * - Thông tin liên hệ chi tiết bên phải
- */
+
 const Contact: React.FC = () => {
   const contactInfo = [
     {
@@ -41,11 +37,11 @@ const Contact: React.FC = () => {
     {
       icon: Globe,
       label: "Website",
-      content: "https://www.agu.edu.vn/vi/tuyen-sinh",
+      content: "https://tuyensinh.agu.edu.vn/",
       iconColor: "text-blue-500",
       bgColor: "bg-blue-50",
       isLink: true,
-      href: "https://www.agu.edu.vn/vi/tuyen-sinh",
+      href: "https://tuyensinh.agu.edu.vn/",
     },
     {
       icon: Facebook,

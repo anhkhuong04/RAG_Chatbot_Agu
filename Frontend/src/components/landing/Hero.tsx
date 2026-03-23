@@ -95,7 +95,7 @@ const Hero: React.FC = () => {
                     width="180"
                     height="60"
                     rx="20"
-                    fill="#2563eb"
+                    fill="#f97316"
                   />
                   <rect
                     x="200"
@@ -103,7 +103,7 @@ const Hero: React.FC = () => {
                     width="160"
                     height="50"
                     rx="20"
-                    fill="#8b5cf6"
+                    fill="#eab308"
                   />
                   <rect
                     x="140"
@@ -111,7 +111,7 @@ const Hero: React.FC = () => {
                     width="200"
                     height="55"
                     rx="20"
-                    fill="#3b82f6"
+                    fill="#f97316"
                   />
 
                   {/* Robot/AI icon */}
@@ -132,31 +132,31 @@ const Hero: React.FC = () => {
                     y1="70"
                     x2="320"
                     y2="55"
-                    stroke="#8b5cf6"
+                    stroke="#f97316"
                     strokeWidth="3"
                   />
-                  <circle cx="320" cy="50" r="8" fill="#8b5cf6" />
+                  <circle cx="320" cy="50" r="8" fill="#eab308" />
 
                   {/* Decorative dots */}
                   <circle
                     cx="100"
                     cy="200"
                     r="6"
-                    fill="#3b82f6"
+                    fill="#f97316"
                     fillOpacity="0.5"
                   />
                   <circle
                     cx="400"
                     cy="300"
                     r="8"
-                    fill="#8b5cf6"
+                    fill="#eab308"
                     fillOpacity="0.5"
                   />
                   <circle
                     cx="380"
                     cy="180"
                     r="5"
-                    fill="#2563eb"
+                    fill="#f97316"
                     fillOpacity="0.5"
                   />
 
@@ -169,8 +169,8 @@ const Hero: React.FC = () => {
                       x2="100%"
                       y2="100%"
                     >
-                      <stop offset="0%" stopColor="#3b82f6" />
-                      <stop offset="100%" stopColor="#8b5cf6" />
+                      <stop offset="0%" stopColor="#f97316" />
+                      <stop offset="100%" stopColor="#eab308" />
                     </linearGradient>
                     <linearGradient
                       id="gradient2"
@@ -179,8 +179,8 @@ const Hero: React.FC = () => {
                       x2="100%"
                       y2="100%"
                     >
-                      <stop offset="0%" stopColor="#2563eb" />
-                      <stop offset="100%" stopColor="#7c3aed" />
+                      <stop offset="0%" stopColor="#f97316" />
+                      <stop offset="100%" stopColor="#eab308" />
                     </linearGradient>
                   </defs>
                 </svg>

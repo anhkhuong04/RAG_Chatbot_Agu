@@ -1,6 +1,5 @@
 import logging
 from typing import List
-
 from llama_index.core import Settings
 from llama_index.core.llms import ChatMessage, MessageRole
 

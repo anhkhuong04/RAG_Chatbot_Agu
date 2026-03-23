@@ -1,8 +1,7 @@
 import asyncio
 import logging
-from typing import List, Optional, Any
+from typing import List, Any
 from dataclasses import dataclass
-
 from llama_index.core import Settings
 from llama_index.core.llms import ChatMessage, MessageRole
 
@@ -97,19 +96,22 @@ Quy tắc:
         enable_expansion: bool = True,
         enable_keywords: bool = True,
         max_expanded_queries: int = 3,
+        enable_hyde: bool = False,
     ):
         self.enable_rewrite = enable_rewrite
         self.enable_expansion = enable_expansion
         self.enable_keywords = enable_keywords
         self.max_expanded_queries = max_expanded_queries
+        self._hyde_expander = HyDEQueryExpander(enabled=enable_hyde)
         
         logger.info(
-            f"✅ QueryRewriter initialized "
-            f"(rewrite={enable_rewrite}, expand={enable_expansion}, keywords={enable_keywords})"
+            f"QueryRewriter initialized "
+            f"(rewrite={enable_rewrite}, expand={enable_expansion}, "
+            f"keywords={enable_keywords}, hyde={enable_hyde})"
         )
     
     async def rewrite(self, query: str) -> RewrittenQuery:
-        logger.info(f"📝 Rewriting query: {query[:50]}...")
+        logger.info(f"Rewriting query: {query[:50]}...")
         
         # Initialize result
         result = RewrittenQuery(
@@ -138,6 +140,10 @@ Quy tắc:
                 task_keys.append("keywords")
                 coros.append(self._extract_keywords(query))
 
+            if self._hyde_expander.enabled:
+                task_keys.append("hyde")
+                coros.append(self._hyde_expander.generate_hypothetical_document(query))
+
             # Run all LLM tasks in parallel
             if coros:
                 results = await asyncio.gather(*coros, return_exceptions=True)
@@ -147,7 +153,7 @@ Quy tắc:
             # Process rewrite result
             if "rewrite" in tasks:
                 if isinstance(tasks["rewrite"], Exception):
-                    logger.warning(f"⚠️ Rewrite task failed: {tasks['rewrite']}")
+                    logger.warning(f"Rewrite task failed: {tasks['rewrite']}")
                 else:
                     result.rewritten = tasks["rewrite"]
                     logger.debug(f"   Rewritten: {result.rewritten}")
@@ -156,7 +162,7 @@ Quy tắc:
             # the expansion already ran in parallel on the original query which is acceptable.
             if "expand" in tasks:
                 if isinstance(tasks["expand"], Exception):
-                    logger.warning(f"⚠️ Expand task failed: {tasks['expand']}")
+                    logger.warning(f"Expand task failed: {tasks['expand']}")
                 else:
                     result.expanded_queries = tasks["expand"]
                     logger.debug(f"   Expanded: {len(result.expanded_queries)} queries")
@@ -164,31 +170,34 @@ Quy tắc:
             # Process keywords result
             if "keywords" in tasks:
                 if isinstance(tasks["keywords"], Exception):
-                    logger.warning(f"⚠️ Keywords task failed: {tasks['keywords']}")
+                    logger.warning(f"Keywords task failed: {tasks['keywords']}")
                 else:
                     result.extracted_keywords = tasks["keywords"]
                     logger.debug(f"   Keywords: {result.extracted_keywords}")
+
+            # Process HyDE result — append hypothetical doc as extra query variant
+            if "hyde" in tasks:
+                if isinstance(tasks["hyde"], Exception):
+                    logger.warning(f"HyDE task failed: {tasks['hyde']}")
+                elif tasks["hyde"]:
+                    hyde_doc = tasks["hyde"]
+                    result.expanded_queries.append(hyde_doc)
+                    logger.debug(f"   HyDE doc appended ({len(hyde_doc)} chars)")
             
             logger.info(
-                f"✅ Query rewritten: '{query[:30]}...' → '{result.rewritten[:30]}...' "
+                f"Query rewritten: '{query[:30]}...' → '{result.rewritten[:30]}...' "
                 f"(+{len(result.expanded_queries)} variants, {len(result.extracted_keywords)} keywords)"
             )
+            log_msg = f"\n[QueryRewriter]\n   ↳ Gốc     : '{query}'\n   ↳ Viết lại: '{result.rewritten}'"
+            if result.expanded_queries:
+                log_msg += f"\n   ↳ Mở rộng : {result.expanded_queries}"
+            logger.info(log_msg)
             
         except Exception as e:
-            logger.error(f"❌ Query rewrite error: {e}")
+            logger.error(f"Query rewrite error: {e}")
             # Return original query on error
         
         return result
-    
-    async def rewrite_simple(self, query: str) -> str:
-        if not self.enable_rewrite:
-            return query
-        
-        try:
-            return await self._rewrite_query(query)
-        except Exception as e:
-            logger.error(f"❌ Simple rewrite error: {e}")
-            return query
     
     async def _rewrite_query(self, query: str) -> str:
         messages = [
@@ -272,21 +281,6 @@ Quy tắc:
         
         return keywords
     
-    async def get_all_queries(self, query: str) -> List[str]:
-        result = await self.rewrite(query)
-        
-        # Collect all unique queries
-        all_queries = [result.original]
-        
-        if result.rewritten != result.original:
-            all_queries.append(result.rewritten)
-        
-        for expanded in result.expanded_queries:
-            if expanded not in all_queries:
-                all_queries.append(expanded)
-        
-        return all_queries
-
 
 class HyDEQueryExpander: 
     HYDE_SYSTEM_PROMPT = """Bạn là chuyên gia tư vấn tuyển sinh đại học.

@@ -100,7 +100,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {!isCollapsed && (
         <div className="flex justify-center items-center pt-6 pb-4 bg-gradient-to-b from-gray-50 to-gray-100">
           <img
-            src="/images/logo_agu.png"
+            src="public/images/logo_agu.png"
             alt="AGU Logo"
             className="w-48 h-24 object-contain drop-shadow-lg"
             onClick={handleMain}
@@ -148,11 +148,10 @@ const Sidebar: React.FC<SidebarProps> = ({
             conversations.map((conv, index) => (
               <div
                 key={conv.id}
-                className={`group relative p-3 mb-2 rounded-xl cursor-pointer flex items-center justify-between transition-all duration-300 ${
-                  activeConversationId === conv.id
-                    ? "bg-blue-100 border border-blue-300 shadow-sm"
-                    : "bg-white border border-transparent hover:bg-gray-50 hover:border-gray-200"
-                }`}
+                className={`group relative p-3 mb-2 rounded-xl cursor-pointer flex items-center justify-between transition-all duration-300 ${activeConversationId === conv.id
+                  ? "bg-blue-100 border border-blue-300 shadow-sm"
+                  : "bg-white border border-transparent hover:bg-gray-50 hover:border-gray-200"
+                  }`}
                 onClick={() => onSelectConversation(conv.id)}
                 style={{ animationDelay: `${index * 50}ms` }}
               >
@@ -166,11 +165,10 @@ const Sidebar: React.FC<SidebarProps> = ({
 
                 <div className="relative flex items-center">
                   <button
-                    className={`p-1.5 bg-transparent border-none text-gray-400 cursor-pointer transition-all duration-200 flex items-center rounded-lg hover:bg-white hover:text-gray-900 hover:shadow-sm ${
-                      openMenuId === conv.id
-                        ? "opacity-100"
-                        : "opacity-0 group-hover:opacity-100"
-                    }`}
+                    className={`p-1.5 bg-transparent border-none text-gray-400 cursor-pointer transition-all duration-200 flex items-center rounded-lg hover:bg-white hover:text-gray-900 hover:shadow-sm ${openMenuId === conv.id
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                      }`}
                     onClick={(e) => toggleMenu(e, conv.id)}
                   >
                     <MoreVertical size={16} />

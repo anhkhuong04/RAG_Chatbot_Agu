@@ -3,17 +3,25 @@ import { Upload, FileText, X, Loader2 } from "lucide-react";
 import type { UploadFormData } from "../../../types/admin";
 import { ACADEMIC_YEARS, CATEGORIES } from "../../../types/admin";
 
-export const getDefaultFormData = (): UploadFormData => ({
-  file: null,
-  year: ACADEMIC_YEARS[0],
-  category: "",
-  description: "",
-});
+// eslint-disable-next-line react-refresh/only-export-components
+export const getDefaultFormData = (
+  years: number[] = ACADEMIC_YEARS,
+): UploadFormData => {
+  const currentYear = new Date().getFullYear();
+  return {
+    file: null,
+    year: years.includes(currentYear) ? currentYear : (years[0] ?? currentYear),
+    category: "",
+    description: "",
+  };
+};
 
 interface UploadFormProps {
   onSubmit: (data: UploadFormData) => Promise<boolean>;
   isUploading: boolean;
   defaultValues: UploadFormData;
+  availableYears?: number[];
+  availableCategories?: string[];
 }
 
 const UPLOAD_STEPS = [
@@ -27,6 +35,8 @@ export const UploadForm = ({
   onSubmit,
   isUploading,
   defaultValues,
+  availableYears = ACADEMIC_YEARS,
+  availableCategories = CATEGORIES,
 }: UploadFormProps) => {
   const [formData, setFormData] = useState<UploadFormData>(defaultValues);
   const [dragActive, setDragActive] = useState(false);
@@ -65,7 +75,10 @@ export const UploadForm = ({
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setFormData((prev: UploadFormData) => ({ ...prev, file: e.target.files![0] }));
+      setFormData((prev: UploadFormData) => ({
+        ...prev,
+        file: e.target.files![0],
+      }));
     }
   };
 
@@ -80,7 +93,7 @@ export const UploadForm = ({
     e.preventDefault();
 
     if (!formData.file) {
-      alert("Vui lòng chọn file (PDF, TXT, DOCX, RTF, JPG, PNG)");
+      alert("Vui lòng chọn file (PDF, TXT, DOCX, RTF, CSV, JPG, PNG)");
       return;
     }
 
@@ -106,7 +119,7 @@ export const UploadForm = ({
   return (
     <form
       onSubmit={handleSubmit}
-      className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+      className="h-full flex flex-col"
     >
       <h2 className="text-base font-semibold text-gray-800 mb-5 flex items-center gap-2">
         <Upload className="w-[18px] h-[18px] text-blue-600" />
@@ -126,7 +139,7 @@ export const UploadForm = ({
         <input
           ref={fileInputRef}
           type="file"
-          accept=".pdf,.txt,.docx,.rtf,.jpg,.jpeg,.png"
+          accept=".pdf,.txt,.docx,.rtf,.csv,.jpg,.jpeg,.png"
           onChange={handleFileChange}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
           disabled={isUploading}
@@ -162,7 +175,7 @@ export const UploadForm = ({
               Kéo thả hoặc click để chọn
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              PDF, TXT, DOCX, RTF, JPG, PNG
+              PDF, TXT, DOCX, RTF, CSV, JPG, PNG
             </p>
           </div>
         )}
@@ -177,12 +190,15 @@ export const UploadForm = ({
           <select
             value={formData.year}
             onChange={(e) =>
-              setFormData((prev: UploadFormData) => ({ ...prev, year: Number(e.target.value) }))
+              setFormData((prev: UploadFormData) => ({
+                ...prev,
+                year: Number(e.target.value),
+              }))
             }
             disabled={isUploading}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           >
-            {ACADEMIC_YEARS.map((year) => (
+            {availableYears.map((year) => (
               <option key={year} value={year}>
                 {year}
               </option>
@@ -197,14 +213,17 @@ export const UploadForm = ({
           <select
             value={formData.category}
             onChange={(e) =>
-              setFormData((prev: UploadFormData) => ({ ...prev, category: e.target.value }))
+              setFormData((prev: UploadFormData) => ({
+                ...prev,
+                category: e.target.value,
+              }))
             }
             disabled={isUploading}
             className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
             required
           >
             <option value="">-- Chọn --</option>
-            {CATEGORIES.map((cat) => (
+            {availableCategories.map((cat) => (
               <option key={cat} value={cat}>
                 {cat}
               </option>
@@ -212,6 +231,15 @@ export const UploadForm = ({
           </select>
         </div>
       </div>
+
+      {formData.category === "Điểm chuẩn" && (
+        <div className="mb-4 p-3 bg-blue-50/80 border border-blue-200 rounded-lg flex items-start gap-2 text-sm text-blue-800">
+          <div className="shrink-0 mt-0.5">💡</div>
+          <div>
+            <strong>Lưu ý:</strong> Vui lòng upload bằng file <strong>.CSV</strong> để dữ liệu điểm chuẩn được cập nhật chính xác tuyệt đối. File CSV cần giữ nguyên các cột chứa chữ <code>MaNganh</code> và <code>NganhHoc</code>. Các cột điểm còn lại (VD: PT1, PT2) hệ thống sẽ tự động quét.
+          </div>
+        </div>
+      )}
 
       {/* Description */}
       <div className="mb-5">
@@ -221,7 +249,10 @@ export const UploadForm = ({
         <textarea
           value={formData.description}
           onChange={(e) =>
-            setFormData((prev: UploadFormData) => ({ ...prev, description: e.target.value }))
+            setFormData((prev: UploadFormData) => ({
+              ...prev,
+              description: e.target.value,
+            }))
           }
           disabled={isUploading}
           placeholder="Nhập mô tả ngắn về tài liệu..."
@@ -260,10 +291,11 @@ export const UploadForm = ({
       <button
         type="submit"
         disabled={isUploading || !formData.file || !formData.category}
-        className={`w-full py-2.5 px-4 rounded-lg text-sm font-medium text-white transition-all flex items-center justify-center gap-2
-          ${isUploading || !formData.file || !formData.category
-            ? "bg-gray-300 cursor-not-allowed"
-            : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-sm"
+        className={`mt-2 w-full py-2.5 px-4 rounded-lg text-sm font-medium text-white transition-all flex items-center justify-center gap-2
+          ${
+            isUploading || !formData.file || !formData.category
+              ? "bg-gray-300 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700 active:scale-[0.98] shadow-sm"
           }`}
       >
         {isUploading ? (
